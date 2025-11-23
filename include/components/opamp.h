@@ -15,7 +15,7 @@ private:
     int n_vcc;
     int n_vee;
 
-    // Parametri utente (nessun default!)
+    // Parametri utente
     double Rout;      // Rout
     double Imax;      // Imax (A)
     double Gain;      // Open-loop gain
@@ -68,61 +68,58 @@ public:
         double Vsat_lo = v_vee + V_headroom;
 
         double g_out = 1.0 / Rout;
+
+        // --- Transconductance nominale
         double gm0 = Gain * g_out;
-
-        // Inserisci Rout in G
-        if (n_out != 0) {
-            G(n_out, n_out) += g_out;
-        }
-
-        // --- Calcolo target lineare ---
         double v_diff = v_p - v_m;
         double v_lin = Gain * v_diff;
 
-        // --- Saturazione morbida: calcolo target ---
+        // --- Saturazione morbida: target
         double span = 0.5 * (Vsat_hi - Vsat_lo);
         double mid  = 0.5 * (Vsat_hi + Vsat_lo);
         double v_sat = mid + span * std::tanh((v_lin - mid) / (0.2 * span));
 
-        // --- Attenua gm quando vicini ai rail ---
-        double k = 1.0 - std::exp(-std::abs(v_o - v_sat) / 0.5);
-        double gm = gm0 * (1.0 - 0.95 * k);
+        // --- GM hard clamp aggressivo in saturazione
+        double Vsat_mag = std::max(span, 1e-6);
+        double sat_threshold = 1.0; // 100% del range
+        double abs_vlin = std::abs(v_lin - mid);
+        double gm = gm0;
 
-        if (gm < 1e-6) gm = 1e-6;
+        if (abs_vlin > sat_threshold * Vsat_mag) {
+            double over = (abs_vlin / (sat_threshold * Vsat_mag)) - 1.0;
+            double denom = 1.0 + 200.0 * std::pow(over + 1e-12, 1.5);
+            double gm_min = 1e-6;
+            gm = std::max(gm_min, gm0 / denom);
+        }
 
-        // Stamp transconductance
+        // --- Stamp G
         if (n_out != 0) {
+            G(n_out, n_out) += g_out;
             if (n_plus != 0)  G(n_out, n_plus)  += gm;
             if (n_minus != 0) G(n_out, n_minus) -= gm;
         }
 
-        // --- Slew rate ---
+        // --- Slew rate
         double v_target = v_sat;
         double maxdv = Sr * dt;
         double dv = v_target - v_out_prev;
-
         if (enable_slew) {
             if (dv > maxdv)       v_target = v_out_prev + maxdv;
             else if (dv < -maxdv) v_target = v_out_prev - maxdv;
         }
 
-        // --- Corrente correttiva ---
+        // --- Corrente correttiva e limitazione Imax
         double i_corr = g_out * (v_target - v_o);
-
-        // Limite di corrente Imax
         if (i_corr >  Imax) i_corr =  Imax;
         if (i_corr < -Imax) i_corr = -Imax;
+        if (n_out != 0) I(n_out) += i_corr;
 
-        if (n_out != 0) {
-            I(n_out) += i_corr;
-        }
-
-        // Input impedance 1M verso massa
+        // --- Input impedance 1M verso massa
         double g_in = 1e-6;
         if (n_plus != 0)  G(n_plus,  n_plus)  += g_in;
         if (n_minus!= 0)  G(n_minus, n_minus) += g_in;
 
-        // Corrente quiescente
+        // --- Corrente quiescente
         double Iq = 0.002;
         if (n_vcc != 0) I(n_vcc) -= Iq;
         if (n_vee != 0) I(n_vee) += Iq;

@@ -1,29 +1,27 @@
-* Distorsore Hard Clipping con OpAmp - CORRETTO
+* Distorsore Hard Clipping con OpAmp
 
 * Alimentazione
-V1 10 0 DC 9       * +9V
-V2 11 0 DC 0       * Ground
+V1 9 0 DC 9
 
 * Bias voltage (metà alimentazione)
-V3 12 0 DC 4.5   
-
+V3 7 0 DC 4.5   
 
 * OpAmp stage
-O1 3 2 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+O1 3 2 4 9 0 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
 
 * Input coupling
 C1 1 5 100e-9  
   
-R1 5 12 1M         * Bias a Vbias (sulla sorgente)
+R1 5 7 1M         * Bias a Vbias (sulla sorgente)
 
 * Input bias per OpAmp
-R4 2 12 100k       * Bias diretto sull'input+ dell'OpAmp
+R4 2 7 100k       * Bias diretto sull'input+ dell'OpAmp
 
 * Resistore di input
 R5 5 2 10k         * Collegamento segnale a in+
 
 * Feedback network (gain = 1 + R3/R2 = 1 + 47k/4.7k ≈ 11)
-R2 4 12 4.7k       * Feedback a Vbias (NON a ground!)
+R2 4 7 4.7k       * Feedback a Vbias (NON a ground!)
 R3 3 4 47k         * Feedback da output
 
 * Output coupling (rimuovi DC bias)
@@ -33,4 +31,4 @@ R6 6 0 100k
 .input 1
 .output 6
 
-.probe distortion.csv V(1) V(2) V(3) V(6) V(12)
+.probe distortion.csv V(1) V(2) V(3) V(6) V(7)

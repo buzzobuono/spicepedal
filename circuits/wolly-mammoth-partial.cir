@@ -2,22 +2,21 @@
 
 VCC 9 0 DC 9V
 
-* two stage amplifier
-
+* Two stage amplifier
 R3 9 1 51k
 R4 9 2 20k
 Q1 1 3 0 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 
+* Pinch pot
 R2 3 4 100k
-Ppinch 4 5 8 500k 0.5 LIN
-*Rpinch 4 5 250k
+Ppinch 4 5 8 500k .5 LIN
 W1 8 5
 
+* Wool pot
 C6 5 6 100e-6
 R1 8 0 2.2k
-Pwool 6 10 0 2k .2 LIN
-*Rwool 6 10 1k
+Pwool 6 10 0 2k .5 LIN
 
 C1 7 3 0.22e-6
 C2 3 0 10e-9

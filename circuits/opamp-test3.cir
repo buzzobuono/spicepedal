@@ -1,16 +1,14 @@
-* Test 3: Saturazione
 
-V1 10 0 DC 15
-V2 11 0 DC -15
-V3 1 0 DC 2.0
+* Alimentazioni ±15V
+VCC 10 0 DC 15
+VEE 11 0 DC -15
 
-O1 3 1 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+* Ingresso DC per forzare differenza tra + e -
+VIN 1 0 DC 5.0
 
-R1 2 0 10k
-R2 3 2 90k
+* OpAmp TL072 senza feedback
+O1 3 1 0 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
 
-.input 1
+* Probing direttamente il nodo out dell'opamp
 .output 3
-
-.probe test3.csv V(1) V(3)
-*Atteso: V(3) ≈ 13.5V (saturato, non 20V)
+.probe test_3.csv V(3)

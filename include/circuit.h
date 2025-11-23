@@ -103,7 +103,7 @@ public:
                     iss >> n1 >> n2 >> l >> unit;
                     l *= parseUnit(unit);
                     components.push_back(std::make_unique<Inductor>(comp_name, n1, n2, l, 100));
-                    std::cout << "   Component Capacitor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" l=" << l << std::endl;
+                    std::cout << "   Component Inductor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" l=" << l << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }

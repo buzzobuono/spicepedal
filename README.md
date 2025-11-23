@@ -169,3 +169,6 @@ MAX_VOLTAGE_STEP = 2.0
     } else if (model == "GENERIC") {
         // Usa defaults, leggi parametri custom
     }
+
+
+
