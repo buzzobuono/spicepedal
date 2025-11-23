@@ -1,0 +1,16 @@
+* Test 2: Inverting
+
+V1 10 0 DC 15
+V2 11 0 DC -15
+V3 1 0 DC 0.1
+
+O1 3 0 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R1 1 2 10k
+R2 2 3 100k
+
+.input 1
+.output 3
+
+.probe test2.csv V(1) V(2) V(3)
+*Atteso: V(3) ≈ -1.0V

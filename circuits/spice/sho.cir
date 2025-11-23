@@ -1,6 +1,7 @@
 .title SHO booster
 .param volume = 0.5
 
+a1 %v([in]) filesrc
 
 V1 0 1 -9
 D1 3 1 D1N4148

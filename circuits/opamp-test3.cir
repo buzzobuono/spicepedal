@@ -1,0 +1,16 @@
+* Test 3: Saturazione
+
+V1 10 0 DC 15
+V2 11 0 DC -15
+V3 1 0 DC 2.0
+
+O1 3 1 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R1 2 0 10k
+R2 3 2 90k
+
+.input 1
+.output 3
+
+.probe test3.csv V(1) V(3)
+*Atteso: V(3) ≈ 13.5V (saturato, non 20V)

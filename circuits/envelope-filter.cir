@@ -1,0 +1,30 @@
+* Envelope Filter con OpAmp TL072
+
+* Alimentazione
+V1 10 0 DC 15    * +15V rail
+V2 11 0 DC -15   * -15V rail
+
+* Input stage - Non-inverting buffer
+O1 2 1 0 10 11 TL072
+
+* State Variable Filter (SVF)
+O2 3 0 4 10 11 TL072     * Integrator 1
+O3 5 0 6 10 11 TL072     * Integrator 2
+O4 7 0 8 10 11 TL072     * Summer/Mixer
+
+* Resistori e condensatori
+R1 1 4 10k
+R2 4 3 10k
+C1 4 3 47n
+
+R3 3 6 10k
+R4 6 5 10k
+C2 6 5 47n
+
+* Feedback network
+R5 5 8 10k
+R6 3 8 10k
+
+* Output
+.output 7
+.input 1

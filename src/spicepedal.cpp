@@ -57,7 +57,11 @@ public:
     bool process(const std::string &input_file, const std::string &output_file)
     {
         if (analysis_type == "DC") {
-            solver->solveDC();
+            std::cout << "DC Analysis" << std::endl;
+            if (!solver->solveDC()) {
+                std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
+            }
+            solver->printDCOperatingPoint();
             return true;
         } else if (analysis_type == "TRAN") {
             std::vector<float> signalIn;
@@ -123,6 +127,8 @@ public:
             
             if (!bypass) {
                 solver->initialize();
+                std::cout << "Circuit initialized with this Operating Point" << std::endl;
+                solver->printDCOperatingPoint();
             }
             
             std::vector<float> signalOut(signalIn.size());
@@ -159,6 +165,7 @@ public:
                 outputPeak = std::max(outputPeak, std::abs(v));
             }
             
+            std::cout << "Simulation ended with this Operating Point" << std::endl;
             solver->printDCOperatingPoint();
             
             // Print statistics

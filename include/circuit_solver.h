@@ -35,9 +35,7 @@ private:
         std::cout << "Circuit WarmUp" << std::endl;
         int warmup_samples = static_cast<int>(warmup_duration / dt);
         for (int i = 0; i < warmup_samples; i++) {
-            if (!solve(0.0)) {
-                std::cerr << "   WarmUp sample " << i << " convergence issue" << std::endl;
-            }
+            solve(0.0);
         }
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
         std::cout << std::endl;
@@ -77,20 +75,13 @@ public:
         if (circuit.hasWarmUp()) {
             warmUp(circuit.warmup_duration);
         }
-        if (!circuit.hasInitialConditions() && !circuit.hasWarmUp() ) {
-            std::cout << "Starting from zero state" << std::endl;
-            std::cout << std::endl;
-        }
         if (circuit.hasProbes()) {
             openProbeFile();
         }
-        printDCOperatingPoint();
         return true;
     }
     
     bool solveDC() {
-        std::cout << "DC Analysis" << std::endl;
-        
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
             I.setZero();
@@ -111,11 +102,9 @@ public:
             double error_sq = (V_new - V).squaredNorm();
             V = V_new;
             if (error_sq < tolerance_sq) {
-                printDCOperatingPoint();
                 return true;
             }
         }
-        std::cerr << "ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
         return false;
     }
 
@@ -164,7 +153,11 @@ public:
                         break;
                     }
                 }
-                logFile << ";" << (found ? current : NAN);
+                if (found) {
+                    logFile << ";" << current;
+                } else {
+                    logFile << ";NaN";
+                }
             }
         }
         
@@ -217,18 +210,11 @@ public:
                 for (auto& comp : circuit.components) {
                     comp->updateHistory(V, dt);
                 }
-
                 logProbes();
                 iteration_count += iter + 1;
                 return true;
             }
         }
-        
-        if (sample_count < max_non_convergence_warning) {
-            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations with final error: " << final_error_sq<< std::endl;
-            printDCOperatingPoint();
-        }
-        
         logProbes();
         failed_count++;
         iteration_count += max_iterations;

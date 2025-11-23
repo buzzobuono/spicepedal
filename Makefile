@@ -1,9 +1,9 @@
 CXX = g++
 ifeq ($(origin TERMUX__PREFIX), environment)
-    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG
+    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops
     INCLUDES = -I$(TERMUX__PREFIX)/include/eigen3 -Iinclude
 else
-    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG #-Wall -Wextra -fsanitize=address 
+    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops #-Wall -Wextra -fsanitize=address 
     INCLUDES = -I/usr/include/eigen3 -Iinclude
 endif
 LIBS_SNDFILE = -lsndfile

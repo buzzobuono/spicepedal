@@ -13,7 +13,8 @@ enum class ComponentType {
     BJT, 
     VOLTAGE_SOURCE,
     POTENTIOMETER,
-    WIRE
+    WIRE,
+    OPAMP
 };
 
 class Component {

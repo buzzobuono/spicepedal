@@ -4,6 +4,8 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 
 ## TODO
 
+- [ ] Which signalOut when solver fail?
+- [ ] Move log outside from solver
 - [ ] Understand convergence issues in *Wolly Mammoth* circuit
 - [x] Add dumpling in Newton-Raphson and measure sistematically performamce: DOESN'T WORK.
 - [x] Add voltage clipping to help convergence: DOESN'T WORK.
@@ -17,8 +19,8 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 - [ ] implement a circuit generic *lv2* plugin
 - [ ] enforce netlist number parsing to avoid collision with measure unit
 - [ ] enforce univocity in circuit directive
-- [ ] use compile-time param to enable statistics printing 
-- [ ] use compile-time param to disable .probe directive (no file production at all)
+- [ ] use compile-time param to enable/disable statistics collecting 
+- [ ] use compile-time param to enable/disable .probe directive (no file production at all)
 - [x] add convergence statistics
 - [ ] potentiometer direct stamping avoiding temporary resistor allocation
 
@@ -31,7 +33,7 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 - Input g: Solver's Execution Time: 6076243 us
 - march=native -DNDEBUG: Solver's Execution Time: 5595021 us
 
-### Temptative
+### Temptatives
 
 spicepedal -i data/input.wav -oout.wav -c circuits/wolly-mammoth.cir
 
@@ -137,3 +139,33 @@ MAX_VOLTAGE_STEP = 2.0
   Solver's Total Samples: 732672
   Solver's Total Iterations: 1.64668e+06
   Solver's Mean Iterations: 2.2475
+
+
+#Opamp
+
+                    // Parametri di default basati sul modello
+    double r_out = 75.0;
+    double i_max = 0.025;
+    double gain = 100000.0;
+    double sr = 13.0e6;
+    
+    // Modelli predefiniti comuni
+    if (model == "TL072" || model == "TL082") {
+        r_out = 75.0;
+        i_max = 0.020;
+        sr = 13.0e6;
+    } else if (model == "JRC4558" || model == "RC4558") {
+        r_out = 100.0;
+        i_max = 0.015;
+        sr = 1.0e6;
+    } else if (model == "LM358" || model == "LM324") {
+        r_out = 100.0;
+        i_max = 0.020;
+        sr = 0.5e6;
+    } else if (model == "OPA2134") {
+        r_out = 50.0;
+        i_max = 0.040;
+        sr = 20.0e6;
+    } else if (model == "GENERIC") {
+        // Usa defaults, leggi parametri custom
+    }

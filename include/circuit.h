@@ -20,6 +20,7 @@
 #include "components/diode.h"
 #include "components/bjt.h"
 #include "components/mosfet.h"
+#include "components/opamp.h"
 #include "components/inductor.h"
 #include "components/potentiometer.h"
 #include "components/wire.h"
@@ -200,6 +201,45 @@ public:
                     max_node = std::max({max_node, n1, n2, nw});
                     break;
                 }
+                case 'O': {
+                    int n_out, n_plus, n_minus, n_vcc, n_vee;
+                    double r_out, i_max, gain, sr;
+                    std::string model;
+                    iss >> n_out >> n_plus >> n_minus >> n_vcc >> n_vee >> model;
+                    std::string token;
+                    while (iss >> token) {
+                        if (token.find("Rout=") == 0) {
+                            r_out = std::stod(token.substr(5));
+                        } else if (token.find("Imax=") == 0) {
+                            i_max = std::stod(token.substr(5));
+                        } else if (token.find("Gain=") == 0) {
+                            gain = std::stod(token.substr(5));
+                        } else if (token.find("Sr=") == 0) {
+                            sr = std::stod(token.substr(3)) * 1e6;  // Assume input in V/µs
+                        }
+                    }
+                    
+                    components.push_back(std::make_unique<OpAmp>(
+                       comp_name, n_out, n_plus, n_minus, n_vcc, n_vee,
+                       r_out, i_max, gain, sr
+                    ));
+    
+                    std::cout << "   Component OpAmp name=" << comp_name
+                    << " model=" << model
+                    << " out=" << n_out
+                    << " in+=" << n_plus
+                    << " in-=" << n_minus
+                    << " vcc=" << n_vcc
+                    << " vee=" << n_vee
+                    << " Rout=" << r_out
+                    << " Imax=" << i_max
+                    << " Gain=" << gain
+                    << " Sr=" << sr
+                    << std::endl;
+                    
+                    max_node = std::max({max_node, n_out, n_plus, n_minus, n_vcc, n_vee});
+                    break;
+                }
                 case '.': {
                     std::string directive = comp_name;
                     if (directive == ".input") {
@@ -256,23 +296,23 @@ public:
 
         std::cout << "Linked Params"<< std::endl;
         for (auto& [id, comp_name] : pending_params) {
-        bool found = false;
-        for (auto& comp : components) {
-            if (comp->name == comp_name) {
-                auto* pot = dynamic_cast<Potentiometer*>(comp.get());
-                if (!pot)
-                    throw std::runtime_error(".param refers to non-potentiometer: " + comp_name);
-                param_map[id] = pot;
-                found = true;
-                std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
-                break;
+            bool found = false;
+            for (auto& comp : components) {
+                if (comp->name == comp_name) {
+                    auto* pot = dynamic_cast<Potentiometer*>(comp.get());
+                    if (!pot)
+                        throw std::runtime_error(".param refers to non-potentiometer: " + comp_name);
+                    param_map[id] = pot;
+                    found = true;
+                    std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
+                    break;
+                }
             }
+            if (!found)
+                throw std::runtime_error(".param component not found: " + comp_name);
         }
-        if (!found)
-            throw std::runtime_error("   .param component not found: " + comp_name);
         std::cout << std::endl;
-    }
-
+        
         return output_node >= 0;
     }
 
@@ -350,12 +390,14 @@ private:
     double parseUnit(const std::string& unit) {
         if (unit.empty()) return 1.0;
         switch(unit[0]) {
+            case 'f': return 1e-15;
             case 'p': return 1e-12;
             case 'n': return 1e-9;
             case 'u': return 1e-6;
             case 'm': return 1e-3;
             case 'k': return 1e3;
             case 'M': return 1e6;
+            case 'G': return 1e9;
             default: 
                 throw std::runtime_error("Unit cannot be determined: " + std::string(1, unit[0]));
             ;
