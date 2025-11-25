@@ -26,3 +26,4 @@ C2 3 0 10e-9
 .warmup 60
 .param 0 Ppinch
 .param 1 Pwool
+.probe wolly-mammoth.csv V(7) V(2)

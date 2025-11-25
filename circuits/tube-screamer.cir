@@ -1,0 +1,21 @@
+.title Tube Screamer - Soft Clipping con Diodi
+
+V1 10 0 DC 15
+V2 11 0 DC -15
+
+O1 3 2 4 10 11 JRC4558 Rout=100 Imax=0.015 Gain=100000 Sr=1
+
+* Input
+C1 1 2 100e-9
+R1 2 0 1M
+
+* Feedback con diodi back-to-back
+R2 4 0 4.7k
+D1 4 3 1N4148 Is=2.52e-9 N=1.752 Vt=0.026 Cj0=4e-12 Vj=0.75 Mj=0.333
+D2 3 4 1N4148 Is=2.52e-9 N=1.752 Vt=0.026 Cj0=4e-12 Vj=0.75 Mj=0.333
+R3 3 4 51k
+
+.input 1
+.output 3
+
+.probe tubescreamer.csv V(1) V(3)

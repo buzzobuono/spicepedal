@@ -1,0 +1,21 @@
+.title Filtro Attivo (Sallen-Key 2nd order LP)
+
+V1 10 0 DC 15
+V2 11 0 DC -15
+
+O1 4 3 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+* Sallen-Key topology (fc ≈ 1kHz, Q ≈ 0.707 Butterworth)
+R1 1 2 10k
+R2 2 3 10k
+C1 2 0 15.9e-9
+C2 3 4 15.9e-9
+
+* Unity gain feedback
+W1 4 3
+
+* SIN(0 1 1000)
+.input 1
+.output 4
+
+.probe opamp-99.csv V(1) V(4)

@@ -21,7 +21,7 @@ BIN_INSTALL_DIR = $(HOME)/bin
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: spicepedal spicepedal-stream spicepedal-plot
+all: spicepedal spicepedal-stream spicepedal-plot 
 
 spicepedal: clean_spicepedal create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG}
@@ -30,7 +30,7 @@ spicepedal-stream: clean_spicepedal-stream create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
 
 spicepedal-plot: clean_spicepedal-plot create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_web.cpp -o bin/spicepedal-plot ${DEBUG}
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
