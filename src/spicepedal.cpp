@@ -65,7 +65,8 @@ public:
             return true;
         } else if (analysis_type == "TRAN") {
             std::vector<float> signalIn;
-            if (!input_file.empty()) { 
+            if (!input_file.empty()) {
+                std::cout << "Circuit input: File" << std::endl;
                 // Open Input WAV
                 SF_INFO sfInfo;
                 sfInfo.format = 0;
@@ -97,14 +98,23 @@ public:
                     signalIn[i] = buffer[i * sfInfo.channels];
                 }
             } else if (input_frequency != 0) {
+                std::cout << "Circuit input: Sinusoid" << std::endl;
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
                 signalIn.resize(total_samples, 0.0f);
                 for (size_t i = 0; i < total_samples; ++i) {
                     double t = i / sample_rate;
                     signalIn[i] = std::sin(2.0 * M_PI * input_frequency * t);
                 }
+            } else {
+                std::cout << "Circuit input: DC" << std::endl;
+                size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
+                signalIn.resize(total_samples, 0.0f);
+                for (size_t i = 0; i < total_samples; ++i) {
+                    signalIn[i] = max_input_voltage;
+                }
             }
-            
+            std::cout << std::endl;
+     
             // Rimuovi DC offset
             float mean = 0.0f;
             for (float s : signalIn) mean += s;
@@ -283,11 +293,11 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    CLI::App app{"SpicePedal: a realtime simple spice-like simulator for audio"};
+    CLI::App app { "SpicePedal: a realtime simple spice-like simulator for audio" };
     
     std::string analysis_type = "TRAN";
     std::string input_file;
-    float input_frequency = 440;
+    float input_frequency = 0;
     int input_duration = 2;
     float max_input_voltage = 0.15;
     int source_impedance = 25000;
@@ -301,7 +311,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC"}))->default_val(analysis_type);
     
     app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
-    app.add_option("-f,--input-frequency", input_frequency, "Input Frequency")->default_val(input_frequency);
+    app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
     app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(max_input_voltage);
     app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
