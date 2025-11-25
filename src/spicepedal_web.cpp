@@ -128,48 +128,10 @@ public:
             font-size: 14px;
             margin-top: 5px;
         }
-        .controls {
-            text-align: center;
-            padding: 10px;
-            background: white;
-            margin-top: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 4px;
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background: #45a049;
-        }
-        button:active {
-            transform: scale(0.98);
-        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>)" << title << R"(</h1>
-        <div class="info">File: )" << filename << R"( | Colonne: )" << column_names.size() 
-             << R"( | Punti: )" << (data.empty() ? 0 : data[0].size()) << R"(</div>
-    </div>
-    
     <div id="plot"></div>
-    
-    <div class="controls">
-        <button onclick='resetZoom()'>Reset Zoom</button>
-        <button onclick='autoScale()'>Auto Scale</button>
-        <button onclick='toggleGrid()'>Toggle Grid</button>
-        <button onclick='downloadPNG()'>Download PNG</button>
-    </div>
-
     <script>
         // Dati
         var traces = [];
@@ -239,8 +201,7 @@ public:
             plot_bgcolor: 'white',
             paper_bgcolor: '#f5f5f5'
         };
-
-        // Config per renderlo ottimo su mobile
+        
         var config = {
             responsive: true,
             displayModeBar: true,
@@ -253,45 +214,10 @@ public:
                 width: 1920,
                 scale: 2
             },
-            scrollZoom: true  // Abilita zoom con scroll/pinch su mobile
+            scrollZoom: true
         };
-
-        // Crea il plot
-        Plotly.newPlot('plot', traces, layout, config);
-
-        // Funzioni controllo
-        var gridVisible = true;
         
-        function resetZoom() {
-            Plotly.relayout('plot', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-        }
-
-        function autoScale() {
-            Plotly.relayout('plot', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-        }
-
-        function toggleGrid() {
-            gridVisible = !gridVisible;
-            Plotly.relayout('plot', {
-                'xaxis.showgrid': gridVisible,
-                'yaxis.showgrid': gridVisible
-            });
-        }
-
-        function downloadPNG() {
-            Plotly.downloadImage('plot', {
-                format: 'png',
-                width: 1920,
-                height: 1080,
-                filename: 'plot'
-            });
-        }
+        Plotly.newPlot('plot', traces, layout, config);
 
         // Rendi il plot responsive al resize della finestra
         window.addEventListener('resize', function() {
@@ -354,32 +280,18 @@ public:
         address.sin_family = AF_INET;
         address.sin_addr.s_addr = INADDR_ANY;
         address.sin_port = htons(port);
-
-        // Bind
+        
         if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
             std::cerr << "Errore bind sulla porta " << port << std::endl;
             std::cerr << "La porta potrebbe essere già in uso. Prova un'altra porta con --port" << std::endl;
             return false;
         }
-
-        // Listen
+        
         if (listen(server_fd, 3) < 0) {
             std::cerr << "Errore listen" << std::endl;
             return false;
         }
-
-        std::cout << "Server HTTP avviato con successo!" << std::endl;
-        std::cout << "Apri il browser a uno di questi indirizzi:" << std::endl;
-        std::cout << "   http://localhost:" << port << std::endl;
-        std::cout << "   http://127.0.0.1:" << port << std::endl;
         
-        // Prova a ottenere l'IP locale
-        printLocalIPs();
-        
-        std::cout << "\nPremi CTRL+C per terminare il server" << std::endl;
-        std::cout << std::string(60, '=') << std::endl;
-        std::cout << std::endl;
-
         return true;
     }
 
@@ -444,17 +356,7 @@ private:
         strftime(buf, sizeof(buf), "%H:%M:%S", &tstruct);
         return buf;
     }
-
-    void printLocalIPs()
-    {
-        // Metodo semplice: suggerisci di controllare manualmente
-        std::cout << "\nPer accedere da altri dispositivi sulla stessa rete:" << std::endl;
-        std::cout << "1. Trova il tuo IP locale:" << std::endl;
-        std::cout << "   Linux/Mac: ifconfig | grep 'inet ' | grep -v 127.0.0.1" << std::endl;
-        std::cout << "   Termux: ifconfig wlan0 | grep 'inet '" << std::endl;
-        std::cout << "2. Usa http://TUO_IP:" << port << std::endl;
-        std::cout << std::endl;
-    }
+    
 };
 
 int main(int argc, char* argv[])
