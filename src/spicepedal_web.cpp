@@ -58,6 +58,7 @@ public:
         infile.close();
         
         std::cout << "CSV file loaded" << std::endl;
+        std::cout << std::endl;
         return true;
     }
     
@@ -203,14 +204,11 @@ int main(int argc, char* argv[])
     app.add_option("-i,--input-file", filename, "Input File")
         ->required()
         ->check(CLI::ExistingFile);
-    
     app.add_option("-s,--separator", separator, "Field Separator")
         ->default_val(separator);
-    
     app.add_option("-p,--port", port, "HTTP Server Port")
         ->default_val(port)
         ->check(CLI::Range(1024, 65535));
-    
     app.add_option("--xmin", x_min, "Minimum X-axis value");
     app.add_option("--xmax", x_max, "Maximum X-axis value");
     app.add_option("--ymin", y_min, "Minimum Y-axis value");
@@ -253,10 +251,13 @@ int main(int argc, char* argv[])
         res.set_content(html, "text/html; charset=utf-8");
     });
     
+    std::cout << "Server started on port " << port << std::endl;
+    std::cout << std::endl;
+    
     if (!svr.listen("0.0.0.0", port)) {
         std::cerr << "Error starting server on port " << port << std::endl;
         return 1;
     }
-
+    
     return 0;
 }
