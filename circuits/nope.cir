@@ -3,3 +3,4 @@ R1 2 0 1000M
 *W 1 2
 .input 1
 .output 2
+.probe nope.csv V(1)V(2)
