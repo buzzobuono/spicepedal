@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 
 #include "external/CLI11.hpp"
+#include "external/httplib.h"
 
 class CSVPlotter
 {
@@ -30,10 +31,7 @@ private:
     
     bool interactive;
     bool ascii_output;
-    bool open_after;
     
-    int ascii_width;
-    int ascii_height;
     int width;
     int height;
     
@@ -73,7 +71,6 @@ private:
 public:
     CSVPlotter(const std::string& file,
                const std::string& sep,
-               const std::string& plot_title,
                const std::string& output,
                const std::string& format,
                double xmin,
@@ -82,14 +79,11 @@ public:
                double ymax,
                bool inter,
                bool ascii,
-               bool open_file,
-               int awidth,
-               int aheight,
-               int w,
-               int h)
+               int width,
+               int height
+               )
         : filename(file),
           separator(sep),
-          title(plot_title),
           output_file(output),
           output_format(format),
           x_min(xmin),
@@ -98,11 +92,8 @@ public:
           y_max(ymax),
           interactive(inter),
           ascii_output(ascii),
-          open_after(open_file),
-          ascii_width(awidth),
-          ascii_height(aheight),
-          width(w),
-          height(h)
+          width(width),
+          height(height)
     {
         auto_x_range = (x_min == std::numeric_limits<double>::lowest() && 
                         x_max == std::numeric_limits<double>::max());
@@ -178,6 +169,131 @@ public:
         return true;
     }
 
+    std::string generatePlotlyHTML(double xmin, double xmax, double ymin, double ymax,
+                                   bool auto_x, bool auto_y)
+    {
+        std::stringstream html;
+        
+        html << R"(<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>)" << filename << R"(</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        #plot {
+            width: 100%;
+            height: calc(100vh - 20px);
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="plot"></div>
+    <script>
+        var traces = [];
+)";
+
+        const std::vector<double>& time = data[0];
+        
+        for (size_t i = 1; i < data.size(); i++) {
+            html << "        traces.push({\n";
+            html << "            x: [";
+            for (size_t j = 0; j < time.size(); j++) {
+                if (j > 0) html << ",";
+                html << time[j];
+            }
+            html << "],\n";
+            
+            html << "            y: [";
+            for (size_t j = 0; j < data[i].size(); j++) {
+                if (j > 0) html << ",";
+                html << data[i][j];
+            }
+            html << "],\n";
+            
+            html << "            mode: 'lines',\n";
+            html << "            name: '" << column_names[i] << "',\n";
+            html << "            line: { width: 2 }\n";
+            html << "        });\n";
+        }
+
+        html << R"(
+        var layout = {
+            title: {
+                text: ')" << filename << R"(',
+                font: { size: 20 }
+            },
+            xaxis: {
+                title: 'Time [s]',
+                gridcolor: '#e0e0e0',
+                showgrid: true,
+)";
+        if (!auto_x) {
+            html << "                range: [" << xmin << ", " << xmax << "],\n";
+        }
+        html << R"(            },
+            yaxis: {
+                title: 'Value',
+                gridcolor: '#e0e0e0',
+                showgrid: true,
+)";
+        if (!auto_y) {
+            html << "                range: [" << ymin << ", " << ymax << "],\n";
+        }
+        html << R"(            },
+            hovermode: 'closest',
+            showlegend: true,
+            legend: {
+                x: 1.02,
+                y: 1,
+                xanchor: 'left',
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: '#ddd',
+                borderwidth: 1
+            },
+            margin: { l: 60, r: 150, t: 60, b: 60 },
+            plot_bgcolor: 'white',
+            paper_bgcolor: '#f5f5f5'
+        };
+        
+        var config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+            displaylogo: false,
+            toImageButtonOptions: {
+                format: 'png',
+                filename: 'plot',
+                height: 1080,
+                width: 1920,
+                scale: 2
+            },
+            scrollZoom: true
+        };
+        
+        Plotly.newPlot('plot', traces, layout, config);
+        
+        window.addEventListener('resize', function() {
+            Plotly.Plots.resize('plot');
+        });
+    </script>
+</body>
+</html>
+)";
+
+        return html.str();
+    }
+
     bool plotWithGnuplot()
     {
         if (data.empty() || column_names.empty()) {
@@ -195,8 +311,8 @@ public:
 
         // Configura terminale in base alle opzioni
         if (ascii_output) {
-            script << "set terminal dumb size " << ascii_width << "," << ascii_height << "\n";
-            std::cout << "Modalità: ASCII Terminal (" << ascii_width << "x" << ascii_height << ")" << std::endl;
+            script << "set terminal dumb size " << width << "," << height << "\n";
+            std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;
         } else if (interactive) {
             script << "set terminal qt persist\n";
             std::cout << "Modalità: Interattiva (Qt Window)" << std::endl;
@@ -245,7 +361,7 @@ public:
             }
         }
         
-        script << "set title '" << title << " - " << filename << "'\n";
+        script << "set title '" << filename << " - " << filename << "'\n";
         script << "set xlabel 'Time [s]'\n";
         script << "set ylabel 'Value'\n";
         script << "set grid\n";
@@ -319,9 +435,6 @@ public:
                 
                 std::cout << std::endl;
                 
-                if (open_after) {
-                    openFile(output_file);
-                }
             } else {
                 std::cerr << "Errore esecuzione Gnuplot." << std::endl;
                 return false;
@@ -334,78 +447,15 @@ public:
         
         return true;
     }
-
-private:
-    bool openFile(const std::string& filepath)
-    {
-        std::cout << "Apertura file..." << std::endl;
-        
-        char absolute_path[PATH_MAX];
-        if (!realpath(filepath.c_str(), absolute_path)) {
-            std::cerr << "Errore: impossibile ottenere percorso assoluto" << std::endl;
-            return false;
-        }
-        
-        std::cout << "   Percorso: " << absolute_path << std::endl;
-        
-        std::ifstream test(absolute_path);
-        if (!test.good()) {
-            std::cerr << "Errore: file non accessibile" << std::endl;
-            return false;
-        }
-        test.close();
-        
-        // xdg-open (Linux)
-        std::string cmd = "xdg-open \"" + std::string(absolute_path) + "\" 2>/dev/null &";
-        if (system(cmd.c_str()) == 0) {
-            std::cout << "   File aperto con xdg-open" << std::endl;
-            return true;
-        }
-        
-        // termux-open (Termux)
-        cmd = "termux-open \"" + std::string(absolute_path) + "\" 2>/dev/null";
-        if (system(cmd.c_str()) == 0) {
-            std::cout << "   File aperto con termux-open" << std::endl;
-            return true;
-        }
-        
-        // Copia in Downloads (Termux)
-        std::string filename_only = filepath.substr(filepath.find_last_of("/") + 1);
-        std::string downloads_path = "/storage/emulated/0/Download/" + filename_only;
-        
-        cmd = "cp \"" + std::string(absolute_path) + "\" \"" + downloads_path + "\" 2>/dev/null";
-        if (system(cmd.c_str()) == 0) {
-            std::cout << "   File copiato in: " << downloads_path << std::endl;
-            
-            cmd = "termux-open \"" + downloads_path + "\" 2>/dev/null";
-            if (system(cmd.c_str()) == 0) {
-                std::cout << "   File aperto da Downloads" << std::endl;
-                return true;
-            }
-        }
-        
-        // termux-share
-        cmd = "termux-share \"" + std::string(absolute_path) + "\" 2>/dev/null";
-        if (system(cmd.c_str()) == 0) {
-            std::cout << "   File condiviso con termux-share" << std::endl;
-            return true;
-        }
-        
-        std::cout << "   Impossibile aprire automaticamente" << std::endl;
-        std::cout << "   Apri manualmente il file: " << absolute_path << std::endl;
-        
-        return false;
-    }
 };
 
 int main(int argc, char* argv[])
 {
-    CLI::App app{"Plot dei segnali da un file CSV di probe"};
-
+    CLI::App app{"SpicePedal Plot: a probe file plot visualiser"};
+   
     std::string filename;
     std::string separator = ";";
-    std::string title = "Probe Signals";
-    std::string output_file = "output.png";
+    std::string output_file;
     std::string output_format = "auto";
     
     double x_min = std::numeric_limits<double>::lowest();
@@ -415,57 +465,44 @@ int main(int argc, char* argv[])
     
     bool interactive = false;
     bool ascii_output = false;
-    bool open_after = false;
+    bool server_mode = false;
+    int server_port = 8080;
     
-    int ascii_width = 0;
-    int ascii_height = 0;
-    int width = 1000;
-    int height = 600;
+    int width = 0;
+    int height = 0;
 
-    app.add_option("file", filename, "Nome del file CSV da leggere (es: probe.csv)")
+    app.add_option("-i,--input-file", filename, "Input File")
         ->required()
         ->check(CLI::ExistingFile);
-    
-    app.add_option("--sep", separator, "Separatore di campo")
+    app.add_option("-s,--separator", separator, "Field Separator")
         ->default_val(separator);
-    
-    app.add_option("--title", title, "Titolo del grafico")
-        ->default_val(title);
-    
-    app.add_option("--save", output_file, "File di output per il grafico")
-        ->default_val(output_file);
-    
-    app.add_option("--format", output_format, "Formato output: auto, png, html, svg, pdf, eps, tikz")
+    app.add_option("--xmin", x_min, "Minimum X-axis value");
+    app.add_option("--xmax", x_max, "Maximum X-axis value");
+    app.add_option("--ymin", y_min, "Minimum Y-axis value");
+    app.add_option("--ymax", y_max, "Maximum Y-axis value");
+    app.add_option("-o,--output-file", output_file, "Output File");
+    app.add_option("--format", output_format, "Output Format: auto, png, html, svg, pdf, eps, tikz")
         ->default_val(output_format)
         ->check(CLI::IsMember({"auto", "png", "html", "svg", "pdf", "eps", "tikz"}));
-    
-    app.add_option("--width", width, "Larghezza output (pixel per png/html/svg)")
+    app.add_option("--width", width, "Width (pixel fir png/html/svg, cols for ascii)")
         ->default_val(width);
-    
-    app.add_option("--height", height, "Altezza output (pixel per png/html/svg)")
+    app.add_option("--height", height, "Height output (pixel for png/html/svg, rows for ascii)")
         ->default_val(height);
-    
-    app.add_option("--xmin", x_min, "Valore minimo asse X");
-    app.add_option("--xmax", x_max, "Valore massimo asse X");
-    app.add_option("--ymin", y_min, "Valore minimo asse Y");
-    app.add_option("--ymax", y_max, "Valore massimo asse Y");
-    
     app.add_flag("-w,--interactive", interactive, "Modalità interattiva con finestra Qt (solo Linux)")
         ->default_val(interactive);
-    
+    app.add_flag("-s,--server-mode", server_mode, "HTTP Server Mode")
+        ->default_val(server_mode);
+    app.add_option("-p,--server-port", server_port, "HTTP Server Port")
+        ->default_val(server_port)
+        ->check(CLI::Range(1024, 65535));
     app.add_flag("-a,--ascii", ascii_output, "Mostra grafico ASCII nel terminale")
         ->default_val(ascii_output);
-    
     app.add_option("--ascii-width", ascii_width, "Larghezza grafico ASCII (0=auto)")
         ->default_val(ascii_width)
         ->check(CLI::Range(0, 500));
-    
     app.add_option("--ascii-height", ascii_height, "Altezza grafico ASCII (0=auto)")
         ->default_val(ascii_height)
         ->check(CLI::Range(0, 100));
-    
-    app.add_flag("-o,--open", open_after, "Apri automaticamente il file generato")
-        ->default_val(open_after);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -474,36 +511,46 @@ int main(int argc, char* argv[])
         return 1;
     }
     
-    if ((interactive || ascii_output) && open_after) {
-        std::cerr << "Warning: --open ignorato in modalità interattiva/ascii" << std::endl;
-        open_after = false;
-    }
-
-    std::cout << "Parametri Input" << std::endl;
-    std::cout << "   File CSV: " << filename << std::endl;
-    std::cout << "   Separatore: " << separator << std::endl;
-    std::cout << "   Titolo: " << title << std::endl;
+    std::cout << "Input Parameters:" << std::endl;
+    std::cout << "   Input File: " << filename << std::endl;
+    std::cout << "   Separator: " << separator << std::endl;
     
     if (!interactive && !ascii_output) {
         std::cout << "   Output File: " << output_file << std::endl;
         std::cout << "   Formato: " << output_format << std::endl;
         std::cout << "   Dimensioni: " << width << "x" << height << std::endl;
-        std::cout << "   Apri automaticamente: " << (open_after ? "Sì" : "No") << std::endl;
     }
-    
+    if (server_mode) {
+        std::cout << "   Port: " << server_port << std::endl;
+    }
     std::cout << std::endl;
 
     try {
-        CSVPlotter plotter(filename, separator, title, output_file, output_format,
+        CSVPlotter plotter(filename, separator, output_file, output_format,
                           x_min, x_max, y_min, y_max,
-                          interactive, ascii_output, open_after,
+                          interactive, ascii_output,
                           ascii_width, ascii_height, width, height);
         
         if (!plotter.loadCSV()) {
             return 1;
         }
-        
-        if (!plotter.plotWithGnuplot()) {
+        if (server_mode) {
+            httplib::Server svr;
+            
+            svr.Get("/", [&](const httplib::Request& req, httplib::Response& res) {
+                std::string html = csv_data.generatePlotlyHTML(x_min, x_max, y_min, y_max, 
+                                                       auto_x_range, auto_y_range);
+                res.set_content(html, "text/html; charset=utf-8");
+            });
+            
+            std::cout << "Server started on port " << server_port << std::endl;
+            std::cout << std::endl;
+            
+            if (!svr.listen("0.0.0.0", server_port)) {
+                std::cerr << "Error starting server on port " << server_port << std::endl;
+                return 1;
+            }
+        } else if (!plotter.plotWithGnuplot()) {
             return 1;
         }
         
