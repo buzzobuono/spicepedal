@@ -26,11 +26,10 @@ private:
     double x_max;
     double y_min;
     double y_max;
-    bool auto_x_range;
-    bool auto_y_range;
+    bool auto_x;
+    bool auto_y;
     
     bool interactive;
-    bool ascii_output;
     
     int width;
     int height;
@@ -50,75 +49,32 @@ private:
         }
     }
     
-    std::string detectFormatFromFilename(const std::string& filename)
-    {
-        size_t dot_pos = filename.find_last_of(".");
-        if (dot_pos == std::string::npos) return "png";
-        
-        std::string ext = filename.substr(dot_pos + 1);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        
-        if (ext == "html" || ext == "htm") return "html";
-        if (ext == "svg") return "svg";
-        if (ext == "pdf") return "pdf";
-        if (ext == "png") return "png";
-        if (ext == "eps") return "eps";
-        if (ext == "tex") return "tikz";
-        
-        return "png"; // default
-    }
-
 public:
-    CSVPlotter(const std::string& file,
-               const std::string& sep,
-               const std::string& output,
-               const std::string& format,
+    CSVPlotter(const std::string& filename,
+               const std::string& separator,
+               const std::string& output_file,
+               const std::string& output_format,
                double xmin,
                double xmax,
                double ymin,
                double ymax,
-               bool inter,
-               bool ascii,
+               bool interactive,
                int width,
                int height
                )
-        : filename(file),
-          separator(sep),
-          output_file(output),
-          output_format(format),
+        : filename(filename),
+          separator(separator),
+          output_file(output_file),
+          output_format(output_format),
           x_min(xmin),
           x_max(xmax),
           y_min(ymin),
           y_max(ymax),
-          interactive(inter),
-          ascii_output(ascii),
+          interactive(interactive),
           width(width),
           height(height)
     {
-        auto_x_range = (x_min == std::numeric_limits<double>::lowest() && 
-                        x_max == std::numeric_limits<double>::max());
-        auto_y_range = (y_min == std::numeric_limits<double>::lowest() && 
-                        y_max == std::numeric_limits<double>::max());
         
-        // Auto-detect formato da estensione se non specificato
-        if (output_format == "auto") {
-            output_format = detectFormatFromFilename(output_file);
-            std::cout << "Formato rilevato da estensione: " << output_format << std::endl;
-        }
-        
-        // Auto-detect dimensioni terminale per ASCII
-        if (ascii_output && ascii_width == 0) {
-            int term_cols, term_rows;
-            getTerminalSize(term_cols, term_rows);
-            ascii_width = term_cols - 2;
-            if (ascii_height == 0) {
-                ascii_height = std::min(30, term_rows - 10);
-            }
-            std::cout << "Dimensioni terminale rilevate: " << term_cols << "x" << term_rows << std::endl;
-            std::cout << "Usando dimensioni ASCII: " << ascii_width << "x" << ascii_height << std::endl;
-        }
-        
-        std::cout << std::endl;
     }
 
     bool loadCSV()
@@ -309,11 +265,7 @@ public:
             return false;
         }
 
-        // Configura terminale in base alle opzioni
-        if (ascii_output) {
-            script << "set terminal dumb size " << width << "," << height << "\n";
-            std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;
-        } else if (interactive) {
+        if (interactive) {
             script << "set terminal qt persist\n";
             std::cout << "Modalità: Interattiva (Qt Window)" << std::endl;
             std::cout << "Controlli finestra:" << std::endl;
@@ -323,7 +275,6 @@ public:
             std::cout << "   - Tasto 'r': Reset view" << std::endl;
             std::cout << std::endl;
         } else {
-            // Configurazione formato output
             if (output_format == "html") {
                 script << "set terminal canvas size " << width << "," << height 
                        << " standalone enhanced mousing jsdir 'https://gnuplot.sourceforge.io/demo_canvas_5.4/'\n";
@@ -352,6 +303,18 @@ public:
                        << (width/100.0) << "," << (height/100.0) << "\n";
                 script << "set output '" << output_file << "'\n";
                 std::cout << "Modalità: EPS (PostScript)" << std::endl;
+            } else if (output_format == "ascii") {
+                int term_cols, term_rows;
+                getTerminalSize(term_cols, term_rows);
+                width = term_cols - 2;
+                if (height == 0) {
+                    height = std::min(30, term_rows - 10);
+                }
+                std::cout << "Detected terminal dimensions: " << term_cols << "x" << term_rows << std::endl;
+                std::cout << "Using ASCII dimensions: " << width << "x" << height << std::endl;
+                script << "set terminal dumb size " << width << "," << height << "\n";
+                std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;       
+                std::cout << std::endl;
             } else {
                 // PNG default (cairo per alta qualità)
                 script << "set terminal pngcairo size " << width << "," << height 
@@ -366,7 +329,7 @@ public:
         script << "set ylabel 'Value'\n";
         script << "set grid\n";
         
-        if (!ascii_output) {
+        if (output_format != "ascii") {
             script << "set key outside right top\n";
         } else {
             script << "set key below\n";
@@ -374,14 +337,14 @@ public:
         
         script << "set datafile separator '" << separator << "'\n";
         
-        if (!auto_x_range) {
+        if (!auto_x) {
             script << "set xrange [" << x_min << ":" << x_max << "]\n";
             std::cout << "X Range: [" << x_min << ", " << x_max << "]" << std::endl;
         } else {
             std::cout << "X Range: Auto" << std::endl;
         }
         
-        if (!auto_y_range) {
+        if (!auto_y) {
             script << "set yrange [" << y_min << ":" << y_max << "]\n";
             std::cout << "Y Range: [" << y_min << ", " << y_max << "]" << std::endl;
         } else {
@@ -409,7 +372,7 @@ public:
         // Esegui Gnuplot
         std::string command = "gnuplot " + script_file;
         
-        if (ascii_output || interactive) {
+        if (output_format == "ascii" || interactive) {
             int result = system(command.c_str());
             
             if (result != 0) {
@@ -456,7 +419,7 @@ int main(int argc, char* argv[])
     std::string filename;
     std::string separator = ";";
     std::string output_file;
-    std::string output_format = "auto";
+    std::string output_format;
     
     double x_min = std::numeric_limits<double>::lowest();
     double x_max = std::numeric_limits<double>::max();
@@ -476,33 +439,30 @@ int main(int argc, char* argv[])
         ->check(CLI::ExistingFile);
     app.add_option("-s,--separator", separator, "Field Separator")
         ->default_val(separator);
-    app.add_option("--xmin", x_min, "Minimum X-axis value");
+    
+        app.add_option("--xmin", x_min, "Minimum X-axis value");
     app.add_option("--xmax", x_max, "Maximum X-axis value");
     app.add_option("--ymin", y_min, "Minimum Y-axis value");
     app.add_option("--ymax", y_max, "Maximum Y-axis value");
+    bool auto_x = (x_min == std::numeric_limits<double>::lowest() && x_max == std::numeric_limits<double>::max());
+    bool auto_y = (y_min == std::numeric_limits<double>::lowest() && y_max == std::numeric_limits<double>::max());
+
     app.add_option("-o,--output-file", output_file, "Output File");
-    app.add_option("--format", output_format, "Output Format: auto, png, html, svg, pdf, eps, tikz")
-        ->default_val(output_format)
-        ->check(CLI::IsMember({"auto", "png", "html", "svg", "pdf", "eps", "tikz"}));
-    app.add_option("--width", width, "Width (pixel fir png/html/svg, cols for ascii)")
+    app.add_option("-f,--format", output_format, "Output Format: png, html, svg, pdf, eps, tex, ascii")
+        ->required()
+        ->check(CLI::IsMember({"png", "html", "svg", "pdf", "eps", "tex", "ascii"}));
+    app.add_option("--width", width, "Width")
         ->default_val(width);
-    app.add_option("--height", height, "Height output (pixel for png/html/svg, rows for ascii)")
+    app.add_option("--height", height, "Height")
         ->default_val(height);
+    
     app.add_flag("-w,--interactive", interactive, "Modalità interattiva con finestra Qt (solo Linux)")
         ->default_val(interactive);
-    app.add_flag("-s,--server-mode", server_mode, "HTTP Server Mode")
+    app.add_flag("-d,--server-mode", server_mode, "HTTP Server Mode")
         ->default_val(server_mode);
     app.add_option("-p,--server-port", server_port, "HTTP Server Port")
         ->default_val(server_port)
         ->check(CLI::Range(1024, 65535));
-    app.add_flag("-a,--ascii", ascii_output, "Mostra grafico ASCII nel terminale")
-        ->default_val(ascii_output);
-    app.add_option("--ascii-width", ascii_width, "Larghezza grafico ASCII (0=auto)")
-        ->default_val(ascii_width)
-        ->check(CLI::Range(0, 500));
-    app.add_option("--ascii-height", ascii_height, "Altezza grafico ASCII (0=auto)")
-        ->default_val(ascii_height)
-        ->check(CLI::Range(0, 100));
 
     CLI11_PARSE(app, argc, argv);
 
@@ -514,8 +474,7 @@ int main(int argc, char* argv[])
     std::cout << "Input Parameters:" << std::endl;
     std::cout << "   Input File: " << filename << std::endl;
     std::cout << "   Separator: " << separator << std::endl;
-    
-    if (!interactive && !ascii_output) {
+    if (!interactive) {
         std::cout << "   Output File: " << output_file << std::endl;
         std::cout << "   Formato: " << output_format << std::endl;
         std::cout << "   Dimensioni: " << width << "x" << height << std::endl;
@@ -526,10 +485,11 @@ int main(int argc, char* argv[])
     std::cout << std::endl;
 
     try {
-        CSVPlotter plotter(filename, separator, output_file, output_format,
+        CSVPlotter plotter(filename, separator, 
+                          output_file, output_format,
                           x_min, x_max, y_min, y_max,
-                          interactive, ascii_output,
-                          ascii_width, ascii_height, width, height);
+                          interactive, 
+                          width, height);
         
         if (!plotter.loadCSV()) {
             return 1;
@@ -538,8 +498,7 @@ int main(int argc, char* argv[])
             httplib::Server svr;
             
             svr.Get("/", [&](const httplib::Request& req, httplib::Response& res) {
-                std::string html = csv_data.generatePlotlyHTML(x_min, x_max, y_min, y_max, 
-                                                       auto_x_range, auto_y_range);
+                std::string html = plotter.generatePlotlyHTML(x_min, x_max, y_min, y_max, auto_x, auto_y);
                 res.set_content(html, "text/html; charset=utf-8");
             });
             
