@@ -29,7 +29,8 @@ private:
     bool auto_x;
     bool auto_y;
     
-    bool interactive;
+    bool interactive_mode;
+    bool ascii_mode;
     
     int width;
     int height;
@@ -58,7 +59,8 @@ public:
                double x_max,
                double y_min,
                double y_max,
-               bool interactive,
+               bool interactive_mode,
+               bool ascii_mode,
                int width,
                int height
                )
@@ -70,7 +72,8 @@ public:
           x_max(x_max),
           y_min(y_min),
           y_max(y_max),
-          interactive(interactive),
+          interactive_mode(interactive_mode),
+          ascii_mode(ascii_mode),
           width(width),
           height(height)
     {
@@ -266,7 +269,7 @@ public:
             return false;
         }
 
-        if (interactive) {
+        if (interactive_mode) {
             script << "set terminal qt persist\n";
             std::cout << "Modalità: Interattiva (Qt Window)" << std::endl;
             std::cout << "Controlli finestra:" << std::endl;
@@ -275,68 +278,49 @@ public:
             std::cout << "   - Tasto 'a': Autoscale" << std::endl;
             std::cout << "   - Tasto 'r': Reset view" << std::endl;
             std::cout << std::endl;
+        } else if (ascii_mode) {
+            int term_cols, term_rows;
+            getTerminalSize(term_cols, term_rows);
+            width = term_cols - 2;
+            if (height == 0) {
+                height = std::min(30, term_rows - 10);
+            }
+            std::cout << "Detected terminal dimensions: " << term_cols << "x" << term_rows << std::endl;
+            std::cout << "Using ASCII dimensions: " << width << "x" << height << std::endl;
+            script << "set terminal dumb size " << width << "," << height << "\n";
+            std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;       
+            std::cout << std::endl;
         } else {
-            if (output_format == "html") {
-                script << "set terminal canvas size " << width << "," << height 
-                       << " standalone enhanced mousing jsdir 'https://gnuplot.sourceforge.io/demo_canvas_5.4/'\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: HTML Canvas (Interattivo nel browser)" << std::endl;
-                std::cout << "Features: zoom, pan, toggle serie, tooltip" << std::endl;
-            } else if (output_format == "svg") {
-                script << "set terminal svg size " << width << "," << height 
-                       << " dynamic enhanced font 'Arial,12'\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: SVG (Vettoriale, interattivo)" << std::endl;
+            if (output_format == "svg") {
+                script << "set terminal svg size " << width << "," << height << " dynamic enhanced font 'Arial,12'" << std::endl;
+                script << "set output '" << output_file << std::endl;
             } else if (output_format == "pdf") {
-                // PDF usa dimensioni in pollici
-                double w_inches = width / 100.0;
-                double h_inches = height / 100.0;
-                script << "set terminal pdfcairo size " << w_inches << "," << h_inches 
-                       << " enhanced font 'Arial,12'\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: PDF (Alta qualità)" << std::endl;
+                script << "set terminal pdfcairo size " << (width / 100.0) << "," << (height / 100.0) << " enhanced font 'Arial,12'" << std::endl;
+                script << "set output '" << output_file << std::endl;
             } else if (output_format == "tikz") {
-                script << "set terminal tikz standalone size " << (width/100.0) << "," << (height/100.0) << "\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: LaTeX/TikZ" << std::endl;
+                script << "set terminal tikz standalone size " << (width / 100.0) << "," << (height / 100.0) << std::endl;
+                script << "set output '" << output_file << std::endl;
             } else if (output_format == "eps") {
-                script << "set terminal postscript eps enhanced color size " 
-                       << (width/100.0) << "," << (height/100.0) << "\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: EPS (PostScript)" << std::endl;
-            } else if (output_format == "ascii") {
-                int term_cols, term_rows;
-                getTerminalSize(term_cols, term_rows);
-                width = term_cols - 2;
-                if (height == 0) {
-                    height = std::min(30, term_rows - 10);
-                }
-                std::cout << "Detected terminal dimensions: " << term_cols << "x" << term_rows << std::endl;
-                std::cout << "Using ASCII dimensions: " << width << "x" << height << std::endl;
-                script << "set terminal dumb size " << width << "," << height << "\n";
-                std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;       
-                std::cout << std::endl;
-            } else {
-                // PNG default (cairo per alta qualità)
-                script << "set terminal pngcairo size " << width << "," << height 
-                       << " enhanced font 'Arial,10'\n";
-                script << "set output '" << output_file << "'\n";
-                std::cout << "Modalità: PNG" << std::endl;
+                script << "set terminal postscript eps enhanced color size " << (width/100.0) << "," << (height/100.0) << std::endl;
+                script << "set output '" << output_file << std::endl;
+            } else if (output_format == "png") {
+                script << "set terminal pngcairo size " << width << "," << height << " enhanced font 'Arial,10'\n";
+                script << "set output '" << output_file << std::endl;
             }
         }
         
-        script << "set title '" << filename << " - " << filename << "'\n";
+        script << "set title '" << filename << std::endl;
         script << "set xlabel 'Time [s]'\n";
         script << "set ylabel 'Value'\n";
         script << "set grid\n";
         
-        if (output_format != "ascii") {
+        if (!ascii_mode) {
             script << "set key outside right top\n";
         } else {
             script << "set key below\n";
         }
         
-        script << "set datafile separator '" << separator << "'\n";
+        script << "set datafile separator '" << separator << std::endl;
         
         if (!auto_x) {
             script << "set xrange [" << x_min << ":" << x_max << "]\n";
@@ -362,7 +346,7 @@ public:
         }
         script << "\n";
         
-        if (interactive) {
+        if (interactive_mode) {
             script << "pause mouse close\n";
         }
         
@@ -373,7 +357,7 @@ public:
         // Esegui Gnuplot
         std::string command = "gnuplot " + script_file;
         
-        if (output_format == "ascii" || interactive) {
+        if (output_format == "ascii" || interactive_mode) {
             int result = system(command.c_str());
             
             if (result != 0) {
@@ -386,40 +370,18 @@ public:
             
             if (result == 0) {
                 std::cout << "Grafico salvato con successo: " << output_file << std::endl;
-                
-                if (output_format == "html") {
-                    std::cout << std::endl;
-                    std::cout << "Apri " << output_file << " nel browser per vedere il grafico interattivo!" << std::endl;
-                    std::cout << "Features disponibili:" << std::endl;
-                    std::cout << "   - Mouse wheel: Zoom in/out" << std::endl;
-                    std::cout << "   - Click + drag: Pan" << std::endl;
-                    std::cout << "   - Click su legenda: Toggle serie on/off" << std::endl;
-                    std::cout << "   - Hover: Mostra valori" << std::endl;
-                }
-                
                 std::cout << std::endl;
-                
             } else {
                 std::cerr << "Errore esecuzione Gnuplot." << std::endl;
                 return false;
             }
         }
         
-        if (!interactive) {
+        if (!interactive_mode) {
             remove(script_file.c_str());
         }
         
         return true;
-    }
-    
-    std::string get_file_extension(const std::string& filename) {
-        std::filesystem::path p(filename);
-        std::string ext = p.extension().string();
-        if (!ext.empty() && ext[0] == '.') {
-            ext = ext.substr(1);
-        }
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        return ext;
     }
     
 };
@@ -438,8 +400,9 @@ int main(int argc, char* argv[])
     double y_min = std::numeric_limits<double>::lowest();
     double y_max = std::numeric_limits<double>::max();
     
-    bool interactive = false;
+    bool interactive_mode = false;
     bool server_mode = false;
+    bool ascii_mode = false;
     int server_port = 8080;
     
     int width = 800;
@@ -457,8 +420,8 @@ int main(int argc, char* argv[])
     app.add_option("--ymax", y_max, "Maximum Y-axis value");
     
     auto* output_file_opt = app.add_option("-o,--output-file", output_file, "Output File");
-    auto* output_format_opt = app.add_option("-f,--format", output_format, "Output Format: png, html, svg, pdf, eps, tex, ascii")
-        ->check(CLI::IsMember({"png", "html", "svg", "pdf", "eps", "tex", "ascii"}));
+    auto* output_format_opt = app.add_option("-f,--format", output_format, "Output Format: png, svg, pdf, eps, tikz")
+        ->check(CLI::IsMember({"png", "svg", "pdf", "eps", "tikz"}));
     output_format_opt->needs(output_file_opt);
     output_file_opt->needs(output_format_opt);
     
@@ -467,27 +430,35 @@ int main(int argc, char* argv[])
     app.add_option("--height", height, "Height")
         ->default_val(height);
     
-    auto* interactive_opt = app.add_flag("-w,--interactive", interactive, "Modalità interattiva con finestra Qt (solo Linux)")
-        ->default_val(interactive);
-    auto* server_mode_opt = app.add_flag("-d,--server-mode", server_mode, "HTTP Server Mode")
+    auto* interactive_mode_opt = app.add_flag("-w,--interactive-mode", interactive_mode, "Interactive Mode")
+        ->default_val(interactive_mode);
+    auto* server_mode_opt = app.add_flag("-d,--server-mode", server_mode, "Server Mode")
         ->default_val(server_mode);
+    auto* ascii_mode_opt = app.add_flag("-a,--ascii-mode", ascii_mode, "Ascii Mode")
+        ->default_val(ascii_mode);
     
-    interactive_opt->excludes(server_mode_opt);
-    server_mode_opt->excludes(interactive_opt);
+    interactive_mode_opt
+        ->excludes(server_mode_opt)
+        ->excludes(ascii_mode_opt);
+    server_mode_opt
+        ->excludes(interactive_mode_opt)
+        ->excludes(ascii_mode_opt);
+    ascii_mode_opt
+        ->excludes(interactive_mode_opt)
+        ->excludes(server_mode_opt);
 
     auto* server_port_opt = app.add_option("-p,--server-port", server_port, "HTTP Server Port")
         ->default_val(server_port)
         ->check(CLI::Range(1024, 65535));
 
     server_port_opt->needs(server_mode_opt);
-    server_mode_opt->needs(server_port_opt);
 
     CLI11_PARSE(app, argc, argv);
     
     std::cout << "Input Parameters:" << std::endl;
     std::cout << "   Input File: " << filename << std::endl;
     std::cout << "   Separator: " << separator << std::endl;
-    if (!interactive) {
+    if (!interactive_mode) {
         std::cout << "   Output File: " << output_file << std::endl;
         std::cout << "   Formato: " << output_format << std::endl;
         std::cout << "   Dimensioni: " << width << "x" << height << std::endl;
@@ -501,7 +472,7 @@ int main(int argc, char* argv[])
         CSVPlotter plotter(filename, separator, 
                           output_file, output_format,
                           x_min, x_max, y_min, y_max,
-                          interactive, 
+                          interactive_mode, ascii_mode, 
                           width, height);
         
         if (!plotter.loadCSV()) {
