@@ -18,7 +18,7 @@ private:
     std::string analysis_type;
     double sample_rate;
     int input_frequency;
-    int input_duration;
+    float input_duration;
     float max_input_voltage;
     int source_impedance;
     bool bypass;
@@ -30,7 +30,7 @@ public:
                      const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
-                     int input_duration,
+                     float input_duration,
                      float max_input_voltage,
                      int source_impedance,
                      bool bypass,
@@ -297,8 +297,8 @@ int main(int argc, char *argv[]) {
     
     std::string analysis_type = "TRAN";
     std::string input_file;
-    float input_frequency = 0;
-    int input_duration = 2;
+    int input_frequency = 0;
+    float input_duration = 2;
     float max_input_voltage = 0.15;
     int source_impedance = 25000;
     int sample_rate = 44100;
