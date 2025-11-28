@@ -54,10 +54,10 @@ public:
                const std::string& separator,
                const std::string& output_file,
                const std::string& output_format,
-               double xmin,
-               double xmax,
-               double ymin,
-               double ymax,
+               double x_min,
+               double x_max,
+               double y_min,
+               double y_max,
                bool interactive,
                int width,
                int height
@@ -66,15 +66,17 @@ public:
           separator(separator),
           output_file(output_file),
           output_format(output_format),
-          x_min(xmin),
-          x_max(xmax),
-          y_min(ymin),
-          y_max(ymax),
+          x_min(x_min),
+          x_max(x_max),
+          y_min(y_min),
+          y_max(y_max),
           interactive(interactive),
           width(width),
           height(height)
     {
-        
+        auto_x = (x_min == std::numeric_limits<double>::lowest() && x_max == std::numeric_limits<double>::max());
+        auto_y = (y_min == std::numeric_limits<double>::lowest() && y_max == std::numeric_limits<double>::max());
+
     }
 
     bool loadCSV()
@@ -125,8 +127,7 @@ public:
         return true;
     }
 
-    std::string generatePlotlyHTML(double xmin, double xmax, double ymin, double ymax,
-                                   bool auto_x, bool auto_y)
+    std::string generatePlotlyHTML()
     {
         std::stringstream html;
         
@@ -195,7 +196,7 @@ public:
                 showgrid: true,
 )";
         if (!auto_x) {
-            html << "                range: [" << xmin << ", " << xmax << "],\n";
+            html << "                range: [" << x_min << ", " << x_max << "],\n";
         }
         html << R"(            },
             yaxis: {
@@ -204,7 +205,7 @@ public:
                 showgrid: true,
 )";
         if (!auto_y) {
-            html << "                range: [" << ymin << ", " << ymax << "],\n";
+            html << "                range: [" << y_min << ", " << y_max << "],\n";
         }
         html << R"(            },
             hovermode: 'closest',
@@ -410,6 +411,17 @@ public:
         
         return true;
     }
+    
+    std::string get_file_extension(const std::string& filename) {
+        std::filesystem::path p(filename);
+        std::string ext = p.extension().string();
+        if (!ext.empty() && ext[0] == '.') {
+            ext = ext.substr(1);
+        }
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext;
+    }
+    
 };
 
 int main(int argc, char* argv[])
@@ -427,12 +439,11 @@ int main(int argc, char* argv[])
     double y_max = std::numeric_limits<double>::max();
     
     bool interactive = false;
-    bool ascii_output = false;
     bool server_mode = false;
     int server_port = 8080;
     
-    int width = 0;
-    int height = 0;
+    int width = 800;
+    int height = 600;
 
     app.add_option("-i,--input-file", filename, "Input File")
         ->required()
@@ -440,36 +451,38 @@ int main(int argc, char* argv[])
     app.add_option("-s,--separator", separator, "Field Separator")
         ->default_val(separator);
     
-        app.add_option("--xmin", x_min, "Minimum X-axis value");
+    app.add_option("--xmin", x_min, "Minimum X-axis value");
     app.add_option("--xmax", x_max, "Maximum X-axis value");
     app.add_option("--ymin", y_min, "Minimum Y-axis value");
     app.add_option("--ymax", y_max, "Maximum Y-axis value");
-    bool auto_x = (x_min == std::numeric_limits<double>::lowest() && x_max == std::numeric_limits<double>::max());
-    bool auto_y = (y_min == std::numeric_limits<double>::lowest() && y_max == std::numeric_limits<double>::max());
-
-    app.add_option("-o,--output-file", output_file, "Output File");
-    app.add_option("-f,--format", output_format, "Output Format: png, html, svg, pdf, eps, tex, ascii")
-        ->required()
+    
+    auto* output_file_opt = app.add_option("-o,--output-file", output_file, "Output File");
+    auto* output_format_opt = app.add_option("-f,--format", output_format, "Output Format: png, html, svg, pdf, eps, tex, ascii")
         ->check(CLI::IsMember({"png", "html", "svg", "pdf", "eps", "tex", "ascii"}));
+    output_format_opt->needs(output_file_opt);
+    output_file_opt->needs(output_format_opt);
+    
     app.add_option("--width", width, "Width")
         ->default_val(width);
     app.add_option("--height", height, "Height")
         ->default_val(height);
     
-    app.add_flag("-w,--interactive", interactive, "Modalità interattiva con finestra Qt (solo Linux)")
+    auto* interactive_opt = app.add_flag("-w,--interactive", interactive, "Modalità interattiva con finestra Qt (solo Linux)")
         ->default_val(interactive);
-    app.add_flag("-d,--server-mode", server_mode, "HTTP Server Mode")
+    auto* server_mode_opt = app.add_flag("-d,--server-mode", server_mode, "HTTP Server Mode")
         ->default_val(server_mode);
-    app.add_option("-p,--server-port", server_port, "HTTP Server Port")
+    
+    interactive_opt->excludes(server_mode_opt);
+    server_mode_opt->excludes(interactive_opt);
+
+    auto* server_port_opt = app.add_option("-p,--server-port", server_port, "HTTP Server Port")
         ->default_val(server_port)
         ->check(CLI::Range(1024, 65535));
 
-    CLI11_PARSE(app, argc, argv);
+    server_port_opt->needs(server_mode_opt);
+    server_mode_opt->needs(server_port_opt);
 
-    if (interactive && ascii_output) {
-        std::cerr << "Errore: non puoi usare --interactive e --ascii insieme" << std::endl;
-        return 1;
-    }
+    CLI11_PARSE(app, argc, argv);
     
     std::cout << "Input Parameters:" << std::endl;
     std::cout << "   Input File: " << filename << std::endl;
@@ -498,7 +511,7 @@ int main(int argc, char* argv[])
             httplib::Server svr;
             
             svr.Get("/", [&](const httplib::Request& req, httplib::Response& res) {
-                std::string html = plotter.generatePlotlyHTML(x_min, x_max, y_min, y_max, auto_x, auto_y);
+                std::string html = plotter.generatePlotlyHTML();
                 res.set_content(html, "text/html; charset=utf-8");
             });
             
