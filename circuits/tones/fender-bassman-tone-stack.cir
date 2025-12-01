@@ -2,11 +2,11 @@
 
 R1 1 4 56k
 C1 1 2 250e-12
-C2 4 5 0.02e-3
+C2 4 5 0.02e-6
 Ptreble 2 5 3 250k 0.1 LIN
 W 5 6
 Pbass 5 7 6 1M 0.1 LIN
-C3 4 8 0.02e-3
+C3 4 8 0.02e-6
 Pmid 7 0 8 25k 0.0LIN
 
 .input 1
