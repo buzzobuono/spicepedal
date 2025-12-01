@@ -9,16 +9,39 @@
 #include <unistd.h>
 #include <climits>
 #include <sys/ioctl.h>
+#include <fftw3.h>
+#include <cmath>
+#include <vector>
+#include <complex>
 
 #include "external/CLI11.hpp"
 #include "external/httplib.h"
 
+struct PlotData
+{
+    std::string title;
+    std::string filename;
+    std::string separator;
+    std::vector<std::vector<double>> data;
+    std::vector<std::string> column_names;
+    std::string type;
+    
+    PlotData() = default;
+    
+    PlotData(std::string title, std::string filename, std::string separator, const std::vector<std::vector<double>>& data, const std::vector<std::string>& column_names, std::string type)
+        : title(title),
+          filename(filename),
+          separator(separator),
+          data(data),
+          column_names(column_names),
+          type(type) {
+            
+        }
+};
+
 class CSVPlotter
 {
 private:
-    std::string filename;
-    std::string separator;
-    std::string title;
     std::string output_file;
     std::string output_format;
     
@@ -29,15 +52,9 @@ private:
     bool auto_x;
     bool auto_y;
     
-    bool interactive_mode;
-    bool ascii_mode;
-    
     int width;
     int height;
     
-    std::vector<std::vector<double>> data;
-    std::vector<std::string> column_names;
-
     void getTerminalSize(int& cols, int& rows)
     {
         struct winsize w;
@@ -51,29 +68,21 @@ private:
     }
     
 public:
-    CSVPlotter(const std::string& filename,
-               const std::string& separator,
-               const std::string& output_file,
+    CSVPlotter(const std::string& output_file,
                const std::string& output_format,
                double x_min,
                double x_max,
                double y_min,
                double y_max,
-               bool interactive_mode,
-               bool ascii_mode,
                int width,
                int height
                )
-        : filename(filename),
-          separator(separator),
-          output_file(output_file),
+        : output_file(output_file),
           output_format(output_format),
           x_min(x_min),
           x_max(x_max),
           y_min(y_min),
           y_max(y_max),
-          interactive_mode(interactive_mode),
-          ascii_mode(ascii_mode),
           width(width),
           height(height)
     {
@@ -82,12 +91,15 @@ public:
 
     }
 
-    bool loadCSV()
+    std::unique_ptr<PlotData> loadCSV(std::string filename, std::string separator)
     {
+        std::vector<std::vector<double>> data;
+        std::vector<std::string> column_names;
+  
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Errore apertura file: " << filename << std::endl;
-            return false;
+            return nullptr;
         }
 
         std::string line;
@@ -113,8 +125,8 @@ public:
                 try {
                     data[col_idx].push_back(std::stod(value));
                 } catch (const std::exception& e) {
-                    std::cerr << "Errore conversione valore: " << value << std::endl;
-                    return false;
+                    std::cerr << "Error: value conversion " << value << std::endl;
+                    return nullptr;
                 }
                 col_idx++;
             }
@@ -127,10 +139,181 @@ public:
         std::cout << "   Righe: " << (data.empty() ? 0 : data[0].size()) << std::endl;
         std::cout << std::endl;
         
-        return true;
+        return std::make_unique<PlotData>(filename, filename, separator, data, column_names, "lin");
     }
 
-    std::string generatePlotlyHTML()
+    std::unique_ptr<PlotData> computeFrequencyResponse(const PlotData& plotData)
+    {
+        size_t input_col = 1;
+        size_t output_col = 2;
+        if (plotData.data.empty() || plotData.data.size() <= std::max(input_col, output_col)) {
+            std::cerr << "Invalid input/output column indices" << std::endl;
+            return nullptr;
+        }
+        if (plotData.data.size() != 3) {
+            std::cerr << "Error: computeFrequencyResponse requires exactly 3 columns (time, input, output), "
+                  << "but found " << plotData.data.size() << " columns." << std::endl;
+            std::cerr << "This function compares two signals to compute H(f) = Output(f) / Input(f)." << std::endl;
+            return nullptr;
+        }
+        size_t N = plotData.data[input_col].size();
+        if (N < 2) return nullptr;
+    
+        // Calcola FFT di input e output
+        size_t out_N = N / 2 + 1;
+    
+        double* in_signal = fftw_alloc_real(N);
+        double* out_signal = fftw_alloc_real(N);
+        fftw_complex* fft_in = fftw_alloc_complex(out_N);
+        fftw_complex* fft_out = fftw_alloc_complex(out_N);
+    
+        fftw_plan plan_in = fftw_plan_dft_r2c_1d(N, in_signal, fft_in, FFTW_ESTIMATE);
+        fftw_plan plan_out = fftw_plan_dft_r2c_1d(N, out_signal, fft_out, FFTW_ESTIMATE);
+        
+        // Copia dati
+        for (size_t i = 0; i < N; ++i) {
+            in_signal[i] = plotData.data[input_col][i];
+            out_signal[i] = plotData.data[output_col][i];
+        }
+        
+        // Esegui FFT
+        fftw_execute(plan_in);
+        fftw_execute(plan_out);
+        
+        // Calcola frequenze
+        double dt = plotData.data[0][1] - plotData.data[0][0];
+        double fs = 1.0 / dt;
+        
+        // Prepara output
+        std::vector<std::vector<double>> response(3); // freq, magnitude_dB, phase
+        response[0].reserve(out_N);
+        response[1].reserve(out_N);
+        response[2].reserve(out_N);
+        
+        for (size_t i = 0; i < out_N; ++i) {
+            double freq = i * fs / N;
+            
+            // Complessi
+            std::complex<double> H_in(fft_in[i][0], fft_in[i][1]);
+            std::complex<double> H_out(fft_out[i][0], fft_out[i][1]);
+            
+            // Funzione di trasferimento H(f) = Out(f) / In(f)
+            std::complex<double> H = H_out / (H_in + 1e-20); // evita divisione per zero
+            
+            double magnitude = std::abs(H);
+            double magnitude_dB = 20.0 * std::log10(magnitude + 1e-20);
+            double phase_deg = std::arg(H) * 180.0 / M_PI;
+            
+            response[0].push_back(freq);
+            response[1].push_back(magnitude_dB);
+            response[2].push_back(phase_deg);
+        }
+        
+        // Cleanup
+        fftw_destroy_plan(plan_in);
+        fftw_destroy_plan(plan_out);
+        fftw_free(in_signal);
+        fftw_free(out_signal);
+        fftw_free(fft_in);
+        fftw_free(fft_out);
+        
+        std::vector<std::string> column_names(3);
+        column_names[0] = "Frequency (Hz)";
+        column_names[1] = "Magnitude (dB)";
+        column_names[2] = "Phase (deg)";
+        
+        return std::make_unique<PlotData>(plotData.title + " (Frequency Response Analysis)", plotData.filename, plotData.separator, response, column_names, "log");
+    }
+    
+    std::unique_ptr<PlotData> convertInFrequencyDomain(const PlotData& plotData)
+    {
+        if (plotData.data.empty() || plotData.data[0].size() < 2) {
+            std::cerr << "Error: insufficient data to perform FFT analysis" << std::endl;
+            return nullptr;
+        }
+
+        size_t num_cols = plotData.data.size();
+        size_t N = plotData.data[0].size();
+        
+        // 1. Calcolo frequenza di campionamento (Fs)
+        // Assumiamo passo costante come richiesto
+        double dt = plotData.data[0][1] - plotData.data[0][0];
+        if (dt <= 0) dt = 1e-9; // Prevenzione divisione per zero
+        double fs = 1.0 / dt;
+
+        // FFTW Real-to-Complex produce N/2 + 1 output (spettro simmetrico)
+        size_t out_N = N / 2 + 1;
+
+        // Struttura dati di output (stesso formato di 'data')
+        std::vector<std::vector<double>> fft_data(num_cols);
+
+        // 2. Preparazione risorse FFTW
+        // Allocazione buffer (riutilizziamo lo stesso buffer per tutte le colonne per risparmiare RAM)
+        double* in = fftw_alloc_real(N);
+        fftw_complex* out = fftw_alloc_complex(out_N);
+
+        // Creiamo il plan una volta sola (FFTW_ESTIMATE è veloce da inizializzare)
+        fftw_plan plan = fftw_plan_dft_r2c_1d(N, in, out, FFTW_ESTIMATE);
+
+        // 3. Generazione Asse Frequenze (Indice 0)
+        fft_data[0].reserve(out_N);
+        for (size_t i = 0; i < out_N; ++i) {
+            double freq = i * fs / N;
+            fft_data[0].push_back(freq);
+        }
+
+        // 4. Elaborazione Segnali (Indici 1...N)
+        for (size_t col = 1; col < num_cols; ++col) {
+            fft_data[col].reserve(out_N);
+
+            // Copia i dati dal vettore std::vector al buffer C di input
+            // (FFTW distrugge l'input durante l'esecuzione con certi flag, quindi meglio ricaricarlo)
+            for (size_t i = 0; i < N; ++i) {
+                in[i] = plotData.data[col][i];
+            }
+
+            // Esegui la FFT
+            fftw_execute(plan);
+
+            // Calcola Magnitudo e normalizza
+            for (size_t i = 0; i < out_N; ++i) {
+                double real = out[i][0];
+                double imag = out[i][1];
+                
+                // Modulo del numero complesso
+                double mag = std::sqrt(real * real + imag * imag);
+                
+                // Normalizzazione matematica standard per segnali discreti
+                mag = mag / N;
+
+                // Moltiplichiamo per 2 per recuperare l'energia delle frequenze negative
+                // (che abbiamo scartato usando r2c), tranne per la componente DC (i=0)
+                if (i > 0) {
+                    mag *= 2.0;
+                }
+
+                fft_data[col].push_back(mag);
+            }
+        }
+        
+        fftw_destroy_plan(plan);
+        fftw_free(in);
+        fftw_free(out);
+        
+        std::vector<std::string> column_names(num_cols);
+        column_names[0] = "Frequency (Hz)";
+        for (size_t col = 1; col < num_cols; ++col) {
+            if (col < plotData.column_names.size() && !plotData.column_names[col].empty()) {
+                column_names[col] = "FFT " + plotData.column_names[col];
+            } else {
+                column_names[col] = "FFT Col" + std::to_string(col);
+            }
+        }
+        
+        return std::make_unique<PlotData>(plotData.title + " (Fast Fourier Transform)", plotData.filename, plotData.separator, fft_data, column_names, "log");
+    }
+    
+    std::string generatePlotlyHTML(const PlotData& plotData)
     {
         std::stringstream html;
         
@@ -139,7 +322,7 @@ public:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>)" << filename << R"(</title>
+    <title>)" << plotData.title << R"(</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body {
@@ -162,10 +345,9 @@ public:
     <script>
         var traces = [];
 )";
-
-        const std::vector<double>& time = data[0];
+        const std::vector<double>& time = plotData.data[0];
         
-        for (size_t i = 1; i < data.size(); i++) {
+        for (size_t i = 1; i < plotData.data.size(); i++) {
             html << "        traces.push({\n";
             html << "            x: [";
             for (size_t j = 0; j < time.size(); j++) {
@@ -175,14 +357,14 @@ public:
             html << "],\n";
             
             html << "            y: [";
-            for (size_t j = 0; j < data[i].size(); j++) {
+            for (size_t j = 0; j < plotData.data[i].size(); j++) {
                 if (j > 0) html << ",";
-                html << data[i][j];
+                html << plotData.data[i][j];
             }
             html << "],\n";
             
             html << "            mode: 'lines',\n";
-            html << "            name: '" << column_names[i] << "',\n";
+            html << "            name: '" << plotData.column_names[i] << "',\n";
             html << "            line: { width: 2 }\n";
             html << "        });\n";
         }
@@ -190,14 +372,14 @@ public:
         html << R"(
         var layout = {
             title: {
-                text: ')" << filename << R"(',
+                text: ')" << plotData.title << R"(',
                 font: { size: 20 }
             },
             xaxis: {
-                title: 'Time [s]',
+                title: ')" << plotData.column_names[0] << R"(',
                 gridcolor: '#e0e0e0',
                 showgrid: true,
-)";
+                type: ')" << plotData.type << "',\n";
         if (!auto_x) {
             html << "                range: [" << x_min << ", " << x_max << "],\n";
         }
@@ -225,7 +407,8 @@ public:
             plot_bgcolor: 'white',
             paper_bgcolor: '#f5f5f5'
         };
-        
+        )";
+        html << R"(
         var config = {
             responsive: true,
             displayModeBar: true,
@@ -240,12 +423,14 @@ public:
             },
             scrollZoom: true
         };
-        
+        )";
+        html << R"(
         Plotly.newPlot('plot', traces, layout, config);
         
         window.addEventListener('resize', function() {
             Plotly.Plots.resize('plot');
-        });
+        }
+        );
     </script>
 </body>
 </html>
@@ -254,10 +439,10 @@ public:
         return html.str();
     }
 
-    bool plotWithGnuplot()
+    bool plotWithGnuplot(const PlotData& plotData)
     {
-        if (data.empty() || column_names.empty()) {
-            std::cerr << "Nessun dato da plottare" << std::endl;
+        if (plotData.data.empty() || plotData.column_names.empty()) {
+            std::cerr << "Error: no data to plot" << std::endl;
             return false;
         }
 
@@ -265,62 +450,53 @@ public:
         std::ofstream script(script_file);
         
         if (!script.is_open()) {
-            std::cerr << "Errore creazione script Gnuplot" << std::endl;
+            std::cerr << "Error: cannot create Gnuplot script" << std::endl;
             return false;
         }
 
-        if (interactive_mode) {
-            script << "set terminal qt persist\n";
-            std::cout << "Modalità: Interattiva (Qt Window)" << std::endl;
-            std::cout << "Controlli finestra:" << std::endl;
-            std::cout << "   - Click destro + trascina: Zoom" << std::endl;
-            std::cout << "   - Shift + trascina: Pan" << std::endl;
-            std::cout << "   - Tasto 'a': Autoscale" << std::endl;
-            std::cout << "   - Tasto 'r': Reset view" << std::endl;
-            std::cout << std::endl;
-        } else if (ascii_mode) {
+        if (output_format == "html") {
+            script << "set terminal canvas size " << width << "," << height << " standalone enhanced mousing jsdir 'https://gnuplot.sourceforge.io/demo_canvas_5.4/'\n";
+            script << "set output '" << output_file << "'" << std::endl;
+        } else if (output_format == "svg") {
+            script << "set terminal svg size " << width << "," << height << " dynamic enhanced font 'Arial,12'\n";
+            script << "set output '" << output_file << "'" << std::endl;
+        } else if (output_format == "pdf") {
+            // PDF usa dimensioni in pollici
+            double w_inches = width / 100.0;
+            double h_inches = height / 100.0;
+            script << "set terminal pdfcairo size " << w_inches << "," << h_inches << " enhanced font 'Arial,12'\n";
+            script << "set output '" << output_file << "'\n";
+        } else if (output_format == "tikz") {
+            script << "set terminal tikz standalone size " << (width/100.0) << "," << (height/100.0) << "\n";
+            script << "set output '" << output_file << "'\n";
+        } else if (output_format == "eps") {
+            script << "set terminal postscript eps enhanced color size " << (width/100.0) << "," << (height/100.0) << "\n";
+            script << "set output '" << output_file << "'\n";
+        } else if (output_format == "ascii") {
             int term_cols, term_rows;
             getTerminalSize(term_cols, term_rows);
             width = term_cols - 2;
             if (height == 0) {
                 height = std::min(30, term_rows - 10);
             }
-            std::cout << "Detected terminal dimensions: " << term_cols << "x" << term_rows << std::endl;
-            std::cout << "Using ASCII dimensions: " << width << "x" << height << std::endl;
             script << "set terminal dumb size " << width << "," << height << "\n";
-            std::cout << "Modalità: ASCII Terminal (" << width << "x" << height << ")" << std::endl;       
-            std::cout << std::endl;
         } else {
-            if (output_format == "svg") {
-                script << "set terminal svg size " << width << "," << height << " dynamic enhanced font 'Arial,12'" << std::endl;
-                script << "set output '" << output_file << std::endl;
-            } else if (output_format == "pdf") {
-                script << "set terminal pdfcairo size " << (width / 100.0) << "," << (height / 100.0) << " enhanced font 'Arial,12'" << std::endl;
-                script << "set output '" << output_file << std::endl;
-            } else if (output_format == "tikz") {
-                script << "set terminal tikz standalone size " << (width / 100.0) << "," << (height / 100.0) << std::endl;
-                script << "set output '" << output_file << std::endl;
-            } else if (output_format == "eps") {
-                script << "set terminal postscript eps enhanced color size " << (width/100.0) << "," << (height/100.0) << std::endl;
-                script << "set output '" << output_file << std::endl;
-            } else if (output_format == "png") {
-                script << "set terminal pngcairo size " << width << "," << height << " enhanced font 'Arial,10'\n";
-                script << "set output '" << output_file << std::endl;
-            }
+            script << "set terminal pngcairo size " << width << "," << height << " enhanced font 'Arial,10'\n";
+            script << "set output '" << output_file << "'\n";
         }
         
-        script << "set title '" << filename << std::endl;
+        script << "set title '" << plotData.title << "'\n";
         script << "set xlabel 'Time [s]'\n";
         script << "set ylabel 'Value'\n";
         script << "set grid\n";
         
-        if (!ascii_mode) {
+        if (output_format != "ascii") {
             script << "set key outside right top\n";
         } else {
             script << "set key below\n";
         }
         
-        script << "set datafile separator '" << separator << std::endl;
+        script << "set datafile separator '" << plotData.separator << "'\n";
         
         if (!auto_x) {
             script << "set xrange [" << x_min << ":" << x_max << "]\n";
@@ -328,7 +504,6 @@ public:
         } else {
             std::cout << "X Range: Auto" << std::endl;
         }
-        
         if (!auto_y) {
             script << "set yrange [" << y_min << ":" << y_max << "]\n";
             std::cout << "Y Range: [" << y_min << ", " << y_max << "]" << std::endl;
@@ -339,29 +514,22 @@ public:
         
         // Plot comando
         script << "plot ";
-        for (size_t i = 1; i < column_names.size(); i++) {
+        for (size_t i = 1; i < plotData.column_names.size(); i++) {
             if (i > 1) script << ", ";
-            script << "'" << filename << "' using 1:" << (i + 1) 
-                   << " with lines title '" << column_names[i] << "'";
+            script << "'" << plotData.filename << "' using 1:" << (i + 1) 
+                   << " with lines title '" << plotData.column_names[i] << "'";
         }
         script << "\n";
         
-        if (interactive_mode) {
-            script << "pause mouse close\n";
-        }
-        
         script.close();
         
-        std::cout << "Script Gnuplot creato: " << script_file << std::endl;
-        
-        // Esegui Gnuplot
         std::string command = "gnuplot " + script_file;
         
-        if (output_format == "ascii" || interactive_mode) {
+        if (output_format == "ascii") {
             int result = system(command.c_str());
             
             if (result != 0) {
-                std::cerr << "Errore esecuzione Gnuplot." << std::endl;
+                std::cerr << "Error: executing Gnuplot" << std::endl;
                 return false;
             }
         } else {
@@ -369,26 +537,32 @@ public:
             int result = system(command.c_str());
             
             if (result == 0) {
-                std::cout << "Grafico salvato con successo: " << output_file << std::endl;
+                std::cout << "Plot saved: " << output_file << std::endl;
                 std::cout << std::endl;
             } else {
-                std::cerr << "Errore esecuzione Gnuplot." << std::endl;
+                std::cerr << "Error: executing Gnuplot" << std::endl;
                 return false;
             }
         }
         
-        if (!interactive_mode) {
-            remove(script_file.c_str());
-        }
-        
         return true;
+    }
+    
+    std::string get_file_extension(const std::string& filename) {
+        std::filesystem::path p(filename);
+        std::string ext = p.extension().string();
+        if (!ext.empty() && ext[0] == '.') {
+            ext = ext.substr(1);
+        }
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext;
     }
     
 };
 
 int main(int argc, char* argv[])
 {
-    CLI::App app{"SpicePedal Plot: a probe file plot visualiser"};
+    CLI::App app{"SpicePedal Plot: .probe file visualizer"};
    
     std::string filename;
     std::string separator = ";";
@@ -400,14 +574,15 @@ int main(int argc, char* argv[])
     double y_min = std::numeric_limits<double>::lowest();
     double y_max = std::numeric_limits<double>::max();
     
-    bool interactive_mode = false;
     bool server_mode = false;
-    bool ascii_mode = false;
     int server_port = 8080;
     
     int width = 800;
     int height = 600;
 
+    bool fft = false;
+    bool fra = false;
+    
     app.add_option("-i,--input-file", filename, "Input File")
         ->required()
         ->check(CLI::ExistingFile);
@@ -420,8 +595,8 @@ int main(int argc, char* argv[])
     app.add_option("--ymax", y_max, "Maximum Y-axis value");
     
     auto* output_file_opt = app.add_option("-o,--output-file", output_file, "Output File");
-    auto* output_format_opt = app.add_option("-f,--format", output_format, "Output Format: png, svg, pdf, eps, tikz")
-        ->check(CLI::IsMember({"png", "svg", "pdf", "eps", "tikz"}));
+    auto* output_format_opt = app.add_option("-f,--format", output_format, "Output Format: png, html, svg, pdf, eps, tex, ascii")
+        ->check(CLI::IsMember({"png", "html", "svg", "pdf", "eps", "tex", "ascii"}));
     output_format_opt->needs(output_file_opt);
     output_file_opt->needs(output_format_opt);
     
@@ -430,59 +605,56 @@ int main(int argc, char* argv[])
     app.add_option("--height", height, "Height")
         ->default_val(height);
     
-    auto* interactive_mode_opt = app.add_flag("-w,--interactive-mode", interactive_mode, "Interactive Mode")
-        ->default_val(interactive_mode);
-    auto* server_mode_opt = app.add_flag("-d,--server-mode", server_mode, "Server Mode")
+    auto* server_mode_opt = app.add_flag("-d,--server-mode", server_mode, "HTTP Server Mode")
         ->default_val(server_mode);
-    auto* ascii_mode_opt = app.add_flag("-a,--ascii-mode", ascii_mode, "Ascii Mode")
-        ->default_val(ascii_mode);
     
-    interactive_mode_opt
-        ->excludes(server_mode_opt)
-        ->excludes(ascii_mode_opt);
-    server_mode_opt
-        ->excludes(interactive_mode_opt)
-        ->excludes(ascii_mode_opt);
-    ascii_mode_opt
-        ->excludes(interactive_mode_opt)
-        ->excludes(server_mode_opt);
-
     auto* server_port_opt = app.add_option("-p,--server-port", server_port, "HTTP Server Port")
         ->default_val(server_port)
         ->check(CLI::Range(1024, 65535));
 
     server_port_opt->needs(server_mode_opt);
-
+    
+    auto* fft_opt = app.add_flag("--fft", fft, "Fast Fourier Transform")
+        ->default_val(fft);
+    auto* fra_opt = app.add_flag("--fra", fra, "Frequency Response Analysis (1=in, 2=out)")
+        ->default_val(fra);
+    fft_opt->excludes(fra_opt);
+    fra_opt->excludes(fft_opt);
+    
     CLI11_PARSE(app, argc, argv);
     
     std::cout << "Input Parameters:" << std::endl;
     std::cout << "   Input File: " << filename << std::endl;
     std::cout << "   Separator: " << separator << std::endl;
-    if (!interactive_mode) {
-        std::cout << "   Output File: " << output_file << std::endl;
-        std::cout << "   Formato: " << output_format << std::endl;
-        std::cout << "   Dimensioni: " << width << "x" << height << std::endl;
-    }
-    if (server_mode) {
-        std::cout << "   Port: " << server_port << std::endl;
-    }
+    std::cout << "   Output File: " << output_file << std::endl;
+    std::cout << "   Formato: " << output_format << std::endl;
+    std::cout << "   Dimensioni: " << width << "x" << height << std::endl;
+    std::cout << "   Port: " << server_port << std::endl;
     std::cout << std::endl;
 
     try {
-        CSVPlotter plotter(filename, separator, 
-                          output_file, output_format,
+        CSVPlotter plotter(output_file, output_format,
                           x_min, x_max, y_min, y_max,
-                          interactive_mode, ascii_mode, 
-                          width, height);
+                          width, height
+                          );
         
-        if (!plotter.loadCSV()) {
+        std::unique_ptr<PlotData> plotData = plotter.loadCSV(filename, separator);
+        if (!plotData) {
+            return 1;
+        }
+        if (fft) {
+            plotData = plotter.convertInFrequencyDomain(*plotData);
+        } else if (fra) {
+            plotData = plotter.computeFrequencyResponse(*plotData);
+        }
+        if (!plotData) {
             return 1;
         }
         if (server_mode) {
             httplib::Server svr;
             
             svr.Get("/", [&](const httplib::Request& req, httplib::Response& res) {
-                std::string html = plotter.generatePlotlyHTML();
+                std::string html = plotter.generatePlotlyHTML(*plotData);
                 res.set_content(html, "text/html; charset=utf-8");
             });
             
@@ -493,7 +665,7 @@ int main(int argc, char* argv[])
                 std::cerr << "Error starting server on port " << server_port << std::endl;
                 return 1;
             }
-        } else if (!plotter.plotWithGnuplot()) {
+        } else if (!plotter.plotWithGnuplot(*plotData)) {
             return 1;
         }
         

@@ -1,13 +1,14 @@
 CXX = g++
 ifeq ($(origin TERMUX__PREFIX), environment)
-    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops
+    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only
     INCLUDES = -I$(TERMUX__PREFIX)/include/eigen3 -Iinclude
 else
-    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops #-Wall -Wextra -fsanitize=address 
+    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only #-Wall -Wextra -fsanitize=address 
     INCLUDES = -I/usr/include/eigen3 -Iinclude
 endif
 LIBS_SNDFILE = -lsndfile
 LIBS_PORTAUDIO = -lportaudio
+LIBS_FFTW3 = -lfftw3
 
 # LV2 Plugin configuration
 PLUGIN_NAME = circuit_simulator
@@ -30,7 +31,7 @@ spicepedal-stream: clean_spicepedal-stream create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
 
 spicepedal-plot: clean_spicepedal-plot create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG} ${LIBS_FFTW3}
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}

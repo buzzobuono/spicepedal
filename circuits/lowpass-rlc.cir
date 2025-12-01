@@ -1,0 +1,13 @@
+.title RLC Low-Pass Filter 100Hz
+
+L1 1 2 1.59
+C1 2 0 1.59e-6
+R1 2 3 10      
+
+* Carico
+Rload 3 0 1k
+
+.input 1
+.output 3
+.probe probe-rlc.csv V(1) V(3)
+* I(L1) I(C1)
