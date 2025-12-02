@@ -5,4 +5,4 @@ C1 2 0 159.15e-9
 
 .input 1
 .output 2
-.probe lowpass.csv V(1) V(2)
+.probe lowpass-rc.csv V(1) V(2)

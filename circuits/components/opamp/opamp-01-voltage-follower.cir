@@ -5,7 +5,6 @@ VEE 11 0 DC -15
 
 OP 2 1 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
 
-* SIN(0 1 440)
 .input 1
 .output 2
-.probe opamp-01.csv V(1) V(2)
+.probe opamp-01-voltage-follower.csv V(1) V(2)
