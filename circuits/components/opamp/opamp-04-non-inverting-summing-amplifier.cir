@@ -3,23 +3,22 @@
 VCC 10 0 DC 15
 VEE 11 0 DC -15
 
-* Due ingressi
-V1 1 0 SIN(0 0.5 440)
-V2 4 0 SIN(0 0.5 660)
+* Due ingressi di cui uno è 1
+* V1 node 1
+V2 3 0 DC 1
 
 * Somma passiva in ingresso
 R1 1 2 10k
-R2 4 2 10k
+R2 3 2 10k
 
-* Amplificatore non invertente
-Rin 3 0 10k
-Rf 3 2 20k
+* Amplificatore non invertente gain ( 1 + R3 / R4 )
+R3 4 0 1k
+R4 4 5 1k
 
 * OpAmp: output = node 3
-XOP 3 2 3 10 11 OPAMP
+OP 5 2 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
 
-.control
-tran 0.1ms 5ms
-plot v(1) v(4) v(3)
-.endc
-.end
+.input 1
+.output 3
+.probe opamp-04-non-inverting-summing-amplifier.csv V(1) V(5)
+
