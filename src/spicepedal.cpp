@@ -18,8 +18,8 @@ private:
     std::string analysis_type;
     double sample_rate;
     int input_frequency;
-    float input_duration;
-    float max_input_voltage;
+    double input_duration;
+    double max_input_voltage;
     bool frequency_sweep;
     int source_impedance;
     bool bypass;
@@ -31,8 +31,8 @@ public:
                      const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
-                     float input_duration,
-                     float max_input_voltage,
+                     double input_duration,
+                     double max_input_voltage,
                      bool frequency_sweep,
                      int source_impedance,
                      bool bypass,
@@ -67,7 +67,7 @@ public:
             solver->printDCOperatingPoint();
             return true;
         } else if (analysis_type == "TRAN") {
-            std::vector<float> signalIn;
+            std::vector<double> signalIn;
             if (!input_file.empty()) {
                 std::cout << "Circuit input: File" << std::endl;
                 // Open Input WAV
@@ -86,8 +86,8 @@ public:
                 if (sample_rate) sample_rate = sfInfo.samplerate;
                 
                 // Leggi tutti i sample
-                std::vector<float> buffer(sfInfo.frames * sfInfo.channels);
-                sf_count_t numFrames = sf_readf_float(file, buffer.data(), sfInfo.frames);
+                std::vector<double> buffer(sfInfo.frames * sfInfo.channels);
+                sf_count_t numFrames = sf_readf_double(file, buffer.data(), sfInfo.frames);
                 sf_close(file);
                 
                 if (numFrames != sfInfo.frames) {
@@ -148,24 +148,24 @@ public:
             std::cout << std::endl;
      
             // Rimuovi DC offset
-            float mean = 0.0f;
-            for (float s : signalIn) mean += s;
+            double mean = 0.0f;
+            for (double s : signalIn) mean += s;
             mean /= signalIn.size();
             
-            for (float& s : signalIn) s -= mean;
+            for (double& s : signalIn) s -= mean;
             
             // Normalizza in Volt
-            float maxNormalized = 0.0f;
-            for (float s : signalIn) {
+            double maxNormalized = 0.0;
+            for (double s : signalIn) {
                 maxNormalized = std::max(maxNormalized, std::abs(s));
             }
             
-            float scale = 1;
-            if (maxNormalized > 1e-10f) {
+            double scale = 1;
+            if (maxNormalized > 1e-10) {
                 scale = max_input_voltage / maxNormalized;
             }
             
-            for (float& s : signalIn) s *= scale;
+            for (double& s : signalIn) s *= scale;
             
             if (!bypass) {
                 solver->initialize();
@@ -173,10 +173,10 @@ public:
                 solver->printDCOperatingPoint();
             }
             
-            std::vector<float> signalOut(signalIn.size());
+            std::vector<double> signalOut(signalIn.size());
             
-            float peak_in = 0.0f, peak_out = 0.0f;
-            float rms_in = 0.0f, rms_out = 0.0f;
+            double peak_in = 0.0, peak_out = 0.0;
+            double rms_in = 0.0, rms_out = 0.0;
             
             auto start = std::chrono::high_resolution_clock::now();
     
@@ -202,8 +202,8 @@ public:
             rms_in = std::sqrt(rms_in / signalIn.size());
             rms_out = std::sqrt(rms_out / signalIn.size());
             
-            float outputPeak = 0.0f;
-            for (float v : signalOut) {
+            double outputPeak = 0.0;
+            for (double v : signalOut) {
                 outputPeak = std::max(outputPeak, std::abs(v));
             }
             
@@ -237,7 +237,7 @@ public:
         }
     }
 
-    bool writeWav(std::vector<float> signalOut,
+    bool writeWav(std::vector<double> signalOut,
               const std::string& output_file,
               int sample_rate,
               int bitDepth = 24) {
@@ -268,7 +268,7 @@ public:
             return false;
         }
         
-        sf_count_t written = sf_writef_float(file, signalOut.data(), signalOut.size());
+        sf_count_t written = sf_writef_double(file, signalOut.data(), signalOut.size());
         sf_close(file);
         
         if (written != (sf_count_t)signalOut.size()) {
@@ -330,8 +330,8 @@ int main(int argc, char *argv[]) {
     std::string analysis_type = "TRAN";
     std::string input_file;
     int input_frequency = 0;
-    float input_duration = 2;
-    float max_input_voltage = 0.15;
+    double input_duration = 2.0;
+    double max_input_voltage = 0.15;
     bool frequency_sweep = false;
     int source_impedance = 25000;
     int sample_rate = 44100;
@@ -346,7 +346,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
-    app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(max_input_voltage);
+    app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0, 5.0))->default_val(max_input_voltage);
     app.add_flag("-F,--frequency-sweep", frequency_sweep, "Frequency Sweep")->default_val(frequency_sweep);
     app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
