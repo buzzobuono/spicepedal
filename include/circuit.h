@@ -162,11 +162,18 @@ public:
                 }
                 case 'V': {
                     int n1, n2;
-                    std::string dcstr;
+                    std::string model;
                     double value;
-                    iss >> n1 >> n2 >> dcstr >> value;
-                    auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value);
-                    std::cout << "   Component VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
+                    double rs = 1;
+                    iss >> n1 >> n2 >> model >> value;
+                    std::string token;
+                    while (iss >> token) {
+                        if (token.find("Rs=") == 0) {
+                            rs = std::stod(token.substr(3));
+                        }
+                    }
+                    auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value, rs);
+                    std::cout << "   Component VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value <<" Rs=" << rs << std::endl;
                     components.push_back(std::move(vs));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;

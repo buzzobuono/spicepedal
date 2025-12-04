@@ -5,16 +5,13 @@ VEE 11 0 DC -15
 
 * Due ingressi di cui uno è 1
 * V1 node 1
-V2 3 0 DC 0.2
+V2 3 0 DC .5
 
 * Somma passiva in ingresso
 R1 1 2 10k
 R2 3 2 10k
-
-
 R3 4 0 10k
 R4 4 5 10k
-
 
 OP 5 2 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
 

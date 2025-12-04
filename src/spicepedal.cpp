@@ -59,6 +59,9 @@ public:
 
     bool process(const std::string &input_file, const std::string &output_file)
     {
+        double mean = 0.0f;
+        double maxNormalized = 0.0;
+        double scale = 1;
         if (analysis_type == "DC") {
             std::cout << "DC Analysis" << std::endl;
             if (!solver->solveDC()) {
@@ -100,6 +103,21 @@ public:
                 for (sf_count_t i = 0; i < numFrames; i++) {
                     signalIn[i] = buffer[i * sfInfo.channels];
                 }
+
+                // Calcola e rimuovi DC offset 
+                for (double s : signalIn) mean += s;
+                mean /= signalIn.size();
+
+                for (double& s : signalIn) s -= mean;
+
+                // Calcola maxNormalized e Normalizza in Volt
+                for (double s : signalIn) {
+                    maxNormalized = std::max(maxNormalized, std::abs(s));
+                }
+                
+                if (maxNormalized > 1e-10) {
+                    scale = max_input_voltage / maxNormalized;
+                }
             } else if (frequency_sweep) {
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
                 signalIn.resize(total_samples, 0.0f);
@@ -129,14 +147,25 @@ public:
                     }
                     std::cout << "Linear sweep: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
                 }
+                
+                // DC offset
+                mean = 0;
+                 // maxNormalized
+                maxNormalized = max_input_voltage;
+
             } else if (input_frequency > 0) {
                 std::cout << "Circuit input: Sinusoid" << std::endl;
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
                 signalIn.resize(total_samples, 0.0f);
                 for (size_t i = 0; i < total_samples; ++i) {
                     double t = i / sample_rate;
-                    signalIn[i] = std::sin(2.0 * M_PI * input_frequency * t);
+                    signalIn[i] = max_input_voltage * std::sin(2.0 * M_PI * input_frequency * t);
                 }
+                // DC offset
+                mean = 0;
+                // maxNormalized
+                maxNormalized = max_input_voltage;
+
             } else {
                 std::cout << "Circuit input: DC" << std::endl;
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
@@ -144,26 +173,12 @@ public:
                 for (size_t i = 0; i < total_samples; ++i) {
                     signalIn[i] = max_input_voltage;
                 }
+                // Calcola DC offset
+                mean = max_input_voltage;
+                 // maxNormalized
+                maxNormalized = max_input_voltage;
             }
             std::cout << std::endl;
-     
-            // Rimuovi DC offset
-            double mean = 0.0f;
-            for (double s : signalIn) mean += s;
-            mean /= signalIn.size();
-            
-            for (double& s : signalIn) s -= mean;
-            
-            // Normalizza in Volt
-            double maxNormalized = 0.0;
-            for (double s : signalIn) {
-                maxNormalized = std::max(maxNormalized, std::abs(s));
-            }
-            
-            double scale = 1;
-            if (maxNormalized > 1e-10) {
-                scale = max_input_voltage / maxNormalized;
-            }
             
             for (double& s : signalIn) s *= scale;
             
@@ -183,7 +198,8 @@ public:
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
-                    if (solver->solve(signalIn[i])) {
+                    solver->setInputVoltage(signalIn[i]);
+                    if (solver->solve()) {
                         signalOut[i] = solver->getOutputVoltage();
                     }
                 } else {

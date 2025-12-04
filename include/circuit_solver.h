@@ -17,6 +17,8 @@ private:
     Eigen::MatrixXd G;
     Eigen::VectorXd I, V, V_new;
     
+    double input_voltage;
+
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
     
     uint64_t sample_count = 0;
@@ -34,8 +36,9 @@ private:
     void warmUp(double warmup_duration) {
         std::cout << "Circuit WarmUp" << std::endl;
         int warmup_samples = static_cast<int>(warmup_duration / dt);
+        input_voltage = 0.0;        
         for (int i = 0; i < warmup_samples; i++) {
-            solve(0.0);
+            solve();
         }
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
         std::cout << std::endl;
@@ -137,11 +140,15 @@ public:
         
         for (auto& p : circuit.probes) {
             if (p.type == ProbeTarget::Type::VOLTAGE) {
-                int node = std::stoi(p.name);
-                if (node < circuit.num_nodes) {
-                    logFile << ";" << V(node);
+                if (p.name == "input") {
+                    logFile << ";" << input_voltage;    
                 } else {
-                    logFile << ";NaN";
+                    int node = std::stoi(p.name);
+                    if (node < circuit.num_nodes) {
+                        logFile << ";" << V(node);
+                    } else {
+                        logFile << ";NaN";
+                    }
                 }
             } else if (p.type == ProbeTarget::Type::CURRENT) {
                 double current = 0.0;
@@ -172,7 +179,7 @@ public:
         }
     }
     
-    bool solve(double input_voltage) {
+    bool solve() {
         sample_count++;
         
         // Newton-Raphson iteration
@@ -241,6 +248,10 @@ public:
         return V(circuit.output_node);
     }
     
+    void setInputVoltage(double vin) {
+        input_voltage = vin;
+    }
+
     void printDCOperatingPoint() {
         for (int i = 0; i < circuit.num_nodes; i++) {
             std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;

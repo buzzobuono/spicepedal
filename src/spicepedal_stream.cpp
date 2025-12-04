@@ -230,7 +230,8 @@ public:
                 for (size_t i = 0; i < numSamples; ++i) {
                     float vin = buffer[i] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     buffer[i] = std::isfinite(vout) ? vout : 0.0f;
@@ -241,7 +242,8 @@ public:
                     size_t idx = frame * 2;
                     float vin = buffer[idx] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     vout = std::isfinite(vout) ? vout : 0.0f;
@@ -254,7 +256,8 @@ public:
                     size_t baseIdx = frame * sfinfo.channels;
                     float vin = buffer[baseIdx] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     vout = std::isfinite(vout) ? vout : 0.0f;
