@@ -9,12 +9,13 @@
 
 #include "circuit.h"
 #include "circuit_solver.h"
+#include "dc_circuit_solver.h"
+#include "zin_circuit_solver.h"
 
 class SpicePedalProcessor
 {
 private:
     Circuit circuit;
-    std::unique_ptr<CircuitSolver> solver;
     std::string analysis_type;
     double sample_rate;
     int input_frequency;
@@ -53,8 +54,7 @@ public:
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
-        
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+
     }
     
     bool process(const std::string &input_file, const std::string &output_file)
@@ -64,16 +64,43 @@ public:
         double scale = 1;
         if (analysis_type == "DC") {
             std::cout << "DC Analysis" << std::endl;
-            if (!solver->solveDC()) {
+            std::unique_ptr<DCCircuitSolver> dc_solver = std::make_unique<DCCircuitSolver>(circuit, max_iterations, tolerance);
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            if (!dc_solver->solve()) {
                 std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
-            solver->printDCOperatingPoint();
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            dc_solver->printDCOperatingPoint();
+
+            std::cout << "Process Statistics:" << std::endl;
+            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
+            std::cout << "  Solver's Failure Percentage: " << dc_solver->getFailurePercentage() << " %" << std::endl;
+            std::cout << "  Solver's Total Samples: " << dc_solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Iterations: " << dc_solver->getTotalIterations() << std::endl;
+            std::cout << "  Solver's Mean Iterations: " << dc_solver->getMeanIterations() << std::endl;
+            std::cout << std::endl;
+
             return true;
         } else if (analysis_type == "ZIn") {
             std::cout << "ZIn Analysis" << std::endl;
-            auto impedance_data = solver->measureInputImpedance(20.0, 20000.0, .5);
-            impedance_data.printSummary();        // Output compatto
-            impedance_data.printByBands();        // Per bande di frequenza
+            std::unique_ptr<ZInCircuitSolver> zin_solver = std::make_unique<ZInCircuitSolver>(circuit, sample_rate, source_impedance, input_frequency, input_duration, max_iterations, tolerance);
+            auto start = std::chrono::high_resolution_clock::now();
+            if (!zin_solver->solve()) {
+                std::cerr << "   ERROR: Zin Analysis not convergent after " << max_iterations << " iterations" << std::endl;
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            zin_solver->printInputImpedance();
+
+            std::cout << "Process Statistics:" << std::endl;
+            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
+            std::cout << "  Solver's Failure Percentage: " << zin_solver->getFailurePercentage() << " %" << std::endl;
+            std::cout << "  Solver's Total Samples: " << zin_solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Iterations: " << zin_solver->getTotalIterations() << std::endl;
+            std::cout << "  Solver's Mean Iterations: " << zin_solver->getMeanIterations() << std::endl;
+            std::cout << std::endl;
             return true;
         } else if (analysis_type == "TRAN") {
             std::vector<double> signalIn;
@@ -188,10 +215,12 @@ public:
             
             for (double& s : signalIn) s *= scale;
             
+            std::unique_ptr<CircuitSolver> tran_solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+
             if (!bypass) {
-                solver->initialize();
+                tran_solver->initialize();
                 std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                solver->printDCOperatingPoint();
+                tran_solver->printDCOperatingPoint();
             }
             
             std::vector<double> signalOut(signalIn.size());
@@ -204,9 +233,9 @@ public:
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
-                    solver->setInputVoltage(signalIn[i]);
-                    if (solver->solve()) {
-                        signalOut[i] = solver->getOutputVoltage();
+                    tran_solver->setInputVoltage(signalIn[i]);
+                    if (tran_solver->solve()) {
+                        signalOut[i] = tran_solver->getOutputVoltage();
                     }
                 } else {
                     signalOut[i] = signalIn[i];
@@ -230,7 +259,7 @@ public:
             }
             
             std::cout << "Simulation ended with this Operating Point" << std::endl;
-            solver->printDCOperatingPoint();
+            tran_solver->printDCOperatingPoint();
             
             // Print statistics
             std::cout << "Audio Statistics:" << std::endl;
@@ -243,10 +272,10 @@ public:
             
             std::cout << "Process Statistics:" << std::endl;
             std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << solver->getMeanIterations() << std::endl;
+            std::cout << "  Solver's Failure Percentage: " << tran_solver->getFailurePercentage() << " %" << std::endl;
+            std::cout << "  Solver's Total Samples: " << tran_solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Iterations: " << tran_solver->getTotalIterations() << std::endl;
+            std::cout << "  Solver's Mean Iterations: " << tran_solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
             
             if (!output_file.empty()) {
