@@ -1,7 +1,0 @@
-* Impedenza di ingresso nota ≈1.37kΩ
-
-R1 1 2 10k
-C1 2 0 100e-9
-
-.input 1
-.output 2 

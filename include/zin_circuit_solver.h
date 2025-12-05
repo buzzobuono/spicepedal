@@ -8,33 +8,40 @@
 #include <iomanip>
 #include <memory>
 #include <map>
+#include <complex>
 #include <Eigen/Dense>
+#include <cmath>
 
 class ZInCircuitSolver {
-
 private:
     Circuit& circuit;
+
     Eigen::MatrixXd G;
-    Eigen::VectorXd I, V, V_new;
-    
-    double input_voltage;
+    Eigen::VectorXd I;
+    Eigen::VectorXd V, V_new;
 
-    double input_frequency;
-    double input_duration;
-
-    Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
-    
-    uint64_t sample_count = 0;
-    uint64_t failed_count = 0;
-    uint64_t iteration_count = 0;
-    
-    double sample_rate;
+    // Parametri di ingresso
+    double input_voltage;            // valore istantaneo della sorgente (V)
+    double input_frequency;          // Hz
+    double input_duration;           // secondi
+    double sample_rate;              // campioni/sec
     int max_iterations;
-    double tolerance_sq;
-    double source_g;
+    double tolerance_sq;             // tolleranza quadrata per NR
 
-    double Z_magnitude;
-    double Z_phase;
+    // sorgente interna (resistenza serie)
+    double source_g;                 // conduttanza 1/R
+
+    // LU solver (riutilizzato)
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
+
+    // statistiche
+    uint64_t sample_count = 0;       // numero di passi temporali simulati
+    uint64_t failed_count = 0;       // numero di passi che non hanno convergito
+    uint64_t iteration_count = 0;    // somma iterazioni NR effettuate
+
+    // risultati
+    double Z_magnitude = 0.0;        // Ohm
+    double Z_phase = 0.0;            // gradi
 
 private:
 
@@ -86,110 +93,144 @@ private:
     }
 
 public:
-    ZInCircuitSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_frequency, double input_duration, int max_iterations, double tolerance) 
+    ZInCircuitSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_frequency, double input_duration, int max_iterations, double tolerance)
         : circuit(circuit),
-          sample_rate(sample_rate),
-          input_frequency(input_frequency),
-          input_duration(input_duration),
-          source_g(1.0 / source_impedance),
-          max_iterations(max_iterations),
-          tolerance_sq(tolerance*tolerance) {
-        
-        G.resize(circuit.num_nodes, circuit.num_nodes);
-        I.resize(circuit.num_nodes);
-        V.resize(circuit.num_nodes);
-        V_new.resize(circuit.num_nodes);
-        V.setZero();
-    }
-    
-    ~ZInCircuitSolver() {
+            sample_rate(sample_rate),
+            input_frequency(input_frequency),
+            input_duration(input_duration),
+            source_g(1.0 / source_impedance),
+            max_iterations(max_iterations),
+            tolerance_sq(tolerance*tolerance) {
+
+                
+        tolerance_sq = tolerance * tolerance;
+
+        // prepara vettori/matrici alla dimensione corretta
+        G = Eigen::MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
+        I = Eigen::VectorXd::Zero(circuit.num_nodes);
+        V = Eigen::VectorXd::Zero(circuit.num_nodes);
+        V_new = Eigen::VectorXd::Zero(circuit.num_nodes);
+
+        input_voltage = 0.0;
     }
 
+    ~ZInCircuitSolver() = default;
+
     bool initialize() {
+        V.setZero();
+        G.setZero();
+        I.setZero();
+        circuit.reset();
+        sample_count = failed_count = iteration_count = 0;
         return true;
     }
 
-    
     bool solve() {
+        // dt e numero di campioni
         double dt = 1.0 / sample_rate;
-        int num_samples = static_cast<int>(input_duration / dt);
-        int skip_samples = num_samples / 2;  // Salta transitori
+        int num_samples = static_cast<int>(std::ceil(input_duration * sample_rate));
+        
+        if (num_samples <= 4) num_samples = std::max(8, num_samples);
 
-        double current_real_sum = 0.0;
-        double current_imag_sum = 0.0;
-        int valid_samples = 0;
+        int skip_samples = num_samples / 2; // scarta transitori nella prima metà
+
+        
+        // accumulatore per i fasori (metodo: calcolo del rapporto tra il fasore della tensione di ingresso e del la corrente misurata)
+        std::complex<double> V_ph(0.0, 0.0);
+        std::complex<double> I_ph(0.0, 0.0);
+
         double omega = 2.0 * M_PI * input_frequency;
-        
-        size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
-        
-        // Simula per la durata specificata
-        for (int s = 0; s < total_samples; s++) {
+
+        // loop temporale
+        for (int s = 0; s < num_samples; ++s) {
             double t = s * dt;
-            double v_ac = std::sin(omega * t);  // 1V amplitude AC
-            input_voltage = v_ac;
 
-            internal_solve(dt);
+            // segnale di ingresso: sin(omega t) amplitude 1 V
+            double v_src = std::sin(omega * t);
+            input_voltage = v_src;
 
-            // Misura corrente solo dopo stabilizzazione (seconda metà)
+            // risolvo lo stato per questo passo
+            bool ok = internal_solve(dt);
+            (void)ok; // non interrompo la misura se qualche passo non converge: lo conto nelle statistiche
+
+            // se siamo nella seconda metà, accumuliamo i fasori
             if (s >= skip_samples) {
-                // Componente reale: in fase con tensione
-                double i_real = (v_ac - V(circuit.input_node)) * source_g;
+                // corrente istantanea dalla sorgente (Ohm's law sulla resistenza serie): i(t) = (v_src - v_node)/R = (v_src - V(node))*g
+                double v_node = 0.0;
+                if (circuit.input_node >= 0 && static_cast<size_t>(circuit.input_node) < static_cast<size_t>(circuit.num_nodes)) {
+                    v_node = V(circuit.input_node);
+                }
+                double i_inst = (v_src - v_node) * source_g;
 
-                // Componente immaginaria: in quadratura con tensione (sfasata 90°)
-                double v_quad = std::cos(omega * t);
-                double i_imag = (v_quad - V(circuit.input_node)) * source_g;
+                // peso complesso = e^{-j omega t} = cos(omega t) - j sin(omega t)
+                double cos_wt = std::cos(omega * t);
+                double sin_wt = std::sin(omega * t);
+                std::complex<double> weight(cos_wt, -sin_wt);
 
-                current_real_sum += i_real;
-                current_imag_sum += i_imag;
-                valid_samples++;
+                // accumula fasori per tensione e corrente (usiamo il valore istantaneo della sorgente come riferimento)
+                V_ph += std::complex<double>(v_src, 0.0) * weight;
+                I_ph += std::complex<double>(i_inst, 0.0) * weight;
             }
         }
 
-        // Corrente complessa media
-        std::complex<double> I_avg(
-            current_real_sum / valid_samples,
-            current_imag_sum / valid_samples
-        );
+        // normalizziamo per il numero di campioni utilizzati
+        int valid_samples = num_samples - skip_samples;
+        if (valid_samples <= 0) return false;
 
-        double I_magnitude = std::abs(I_avg);
+        V_ph /= static_cast<double>(valid_samples);
+        I_ph /= static_cast<double>(valid_samples);
 
-        // Zin = V / I = (1+j0) / I_avg
-        std::complex<double> Z_in = (I_magnitude > 1e-12) ? std::complex<double>(1.0, 0.0) / I_avg : std::complex<double>(1e12, 0.0);  // Impedenza molto alta se corrente trascurabile
-
+        // Se la corrente è trascurabile, assegna impedenza molto alta
+        const double min_current = 1e-12;
+        std::complex<double> Z_in;
+        if (std::abs(I_ph) < min_current) {
+            Z_in = std::complex<double>(1e12, 0.0);
+        } else {
+            // Attenzione convenzione di fase: abbiamo usato v_src come sin(omega t) e peso e^{-j omega t}; risultato è correttamente il fasore di V e I
+            Z_in = V_ph / I_ph;
+        }
+        
         Z_magnitude = std::abs(Z_in);
-        Z_phase = std::arg(Z_in) * 180.0 / M_PI;  // Fase in gradi
+        Z_phase = std::arg(Z_in) * 180.0 / M_PI; // in gradi
 
         return true;
     }
 
-    void printInputImpedance() {
-        std::cout << "   " << std::fixed << std::setprecision(1) << input_frequency << " Hz: " 
-                    << std::setprecision(2) << (Z_magnitude / 1000.0) << " kΩ, "
-                    << std::setprecision(1) << Z_phase << "°" << std::endl;
+    void printInputImpedance() const {
+        std::cout << "   " << std::fixed << std::setprecision(1) << input_frequency << " Hz: "
+                  << std::setprecision(2) << (Z_magnitude / 1000.0) << " k\u03A9, "
+                  << std::setprecision(1) << Z_phase << "°" << std::endl;
         std::cout << std::endl;
     }
 
-    double getFailurePercentage() {
-        return (sample_count > 0) ? (100.0 * failed_count / sample_count) : 0.0;
+    // statistiche di convergenza
+    double getFailurePercentage() const {
+        return (sample_count > 0) ? (100.0 * static_cast<double>(failed_count) / static_cast<double>(sample_count)) : 0.0;
     }
-    
-    double getTotalIterations() {
-        return iteration_count;
+
+    double getTotalIterations() const {
+        return static_cast<double>(iteration_count);
     }
-    
-    double getTotalSamples() {
-        return sample_count;
+
+    double getTotalSamples() const {
+        return static_cast<double>(sample_count);
     }
-    
-    double getMeanIterations() {
-        return (sample_count > 0) ? (1.0 * iteration_count / sample_count) : 0.0;
+
+    double getMeanIterations() const {
+        return (sample_count > 0) ? (static_cast<double>(iteration_count) / static_cast<double>(sample_count)) : 0.0;
     }
 
     void reset() {
         V.setZero();
+        G.setZero();
+        I.setZero();
         circuit.reset();
+        sample_count = failed_count = iteration_count = 0;
     }
-    
+
+    // accessori
+    double getZMagnitude() const { return Z_magnitude; }
+    double getZPhaseDegrees() const { return Z_phase; }
 };
 
-#endif
+#endif // ZIN_CIRCUIT_SOLVER_H

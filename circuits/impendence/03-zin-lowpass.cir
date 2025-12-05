@@ -1,0 +1,8 @@
+* RC High Pass
+* Zin = 10 kΩ + source_impendence per F alte
+
+R1 1 2 10k
+C1 2 0 100n
+
+.input 1
+.output 2
