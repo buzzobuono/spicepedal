@@ -14,8 +14,7 @@ C2 3 4 15.9e-9
 * Unity gain feedback
 W1 4 3
 
-* SIN(0 1 1000)
 .input 1
 .output 4
 
-.probe opamp-99.csv V(1) V(4)
+.probe opamp-99-lowpass.csv V(1) V(4)

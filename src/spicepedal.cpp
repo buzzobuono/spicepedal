@@ -56,7 +56,7 @@ public:
         
         solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
     }
-
+    
     bool process(const std::string &input_file, const std::string &output_file)
     {
         double mean = 0.0f;
@@ -68,6 +68,12 @@ public:
                 std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
             solver->printDCOperatingPoint();
+            return true;
+        } else if (analysis_type == "ZIn") {
+            std::cout << "ZIn Analysis" << std::endl;
+            auto impedance_data = solver->measureInputImpedance(20.0, 20000.0, .5);
+            impedance_data.printSummary();        // Output compatto
+            impedance_data.printByBands();        // Per bande di frequenza
             return true;
         } else if (analysis_type == "TRAN") {
             std::vector<double> signalIn;
@@ -357,7 +363,7 @@ int main(int argc, char *argv[]) {
     int max_iterations = 20;
     double tolerance = 1e-6;
     
-    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC"}))->default_val(analysis_type);
+    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC", "ZIn"}))->default_val(analysis_type);
     
     app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
