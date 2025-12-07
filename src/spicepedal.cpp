@@ -8,7 +8,7 @@
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
-#include "circuit_solver.h"
+#include "tran_circuit_solver.h"
 #include "dc_circuit_solver.h"
 #include "zin_circuit_solver.h"
 #include "zout_circuit_solver.h"
@@ -235,7 +235,7 @@ public:
             
             for (double& s : signalIn) s *= scale;
             
-            std::unique_ptr<CircuitSolver> tran_solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+            std::unique_ptr<TranCircuitSolver> tran_solver = std::make_unique<TranCircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
 
             if (!bypass) {
                 tran_solver->initialize();

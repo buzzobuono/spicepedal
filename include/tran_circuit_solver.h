@@ -1,5 +1,5 @@
-#ifndef CIRCUIT_SOLVER_H
-#define CIRCUIT_SOLVER_H
+#ifndef TRAN_CIRCUIT_SOLVER_H
+#define TRAN_CIRCUIT_SOLVER_H
 
 #include "circuit.h"
 
@@ -10,7 +10,7 @@
 #include <map>
 #include <Eigen/Dense>
 
-class CircuitSolver {
+class TranCircuitSolver {
 
 private:
     Circuit& circuit;
@@ -47,7 +47,7 @@ private:
     }
     
 public:
-    CircuitSolver(Circuit& circuit, double sample_rate, int source_impedance, int max_iterations, double tolerance) 
+    TranCircuitSolver(Circuit& circuit, double sample_rate, int source_impedance, int max_iterations, double tolerance) 
         : circuit(circuit), 
           dt(1.0 / sample_rate),
           source_g(1.0 / source_impedance),
@@ -61,7 +61,7 @@ public:
         V.setZero();
     }
     
-    ~CircuitSolver() {
+    ~TranCircuitSolver() {
         if (circuit.hasProbes()) {
             closeProbeFile();
         }
