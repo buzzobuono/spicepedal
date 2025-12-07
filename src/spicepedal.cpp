@@ -11,6 +11,7 @@
 #include "circuit_solver.h"
 #include "dc_circuit_solver.h"
 #include "zin_circuit_solver.h"
+#include "zout_circuit_solver.h"
 
 class SpicePedalProcessor
 {
@@ -100,6 +101,25 @@ public:
             std::cout << "  Solver's Total Samples: " << zin_solver->getTotalSamples() << std::endl;
             std::cout << "  Solver's Total Iterations: " << zin_solver->getTotalIterations() << std::endl;
             std::cout << "  Solver's Mean Iterations: " << zin_solver->getMeanIterations() << std::endl;
+            std::cout << std::endl;
+            return true;
+        }  else if (analysis_type == "ZOut") {
+            std::cout << "ZOut Analysis" << std::endl;
+            std::unique_ptr<ZOutCircuitSolver> zout_solver = std::make_unique<ZOutCircuitSolver>(circuit, sample_rate, source_impedance, max_input_voltage, input_frequency, input_duration, max_iterations, tolerance);
+            auto start = std::chrono::high_resolution_clock::now();
+            if (!zout_solver->solve()) {
+                std::cerr << "   ERROR: Zout Analysis not convergent after " << max_iterations << " iterations" << std::endl;
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            
+            zout_solver->printOutputImpedance();
+
+            std::cout << "Process Statistics:" << std::endl;
+            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
+            std::cout << "  Solver's Failure Percentage: " << zout_solver->getFailurePercentage() << " %" << std::endl;
+            std::cout << "  Solver's Total Samples: " << zout_solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Iterations: " << zout_solver->getTotalIterations() << std::endl;
+            std::cout << "  Solver's Mean Iterations: " << zout_solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
             return true;
         } else if (analysis_type == "TRAN") {
@@ -392,7 +412,7 @@ int main(int argc, char *argv[]) {
     int max_iterations = 20;
     double tolerance = 1e-6;
     
-    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC", "ZIn"}))->default_val(analysis_type);
+    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC", "ZIn", "ZOut"}))->default_val(analysis_type);
     
     app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
