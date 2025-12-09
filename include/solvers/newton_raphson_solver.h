@@ -20,7 +20,24 @@ class NewtonRaphsonSolver : public Solver {
     int max_iterations;
     double tolerance_sq;
     double dt;
+    
+    void warmUp(double warmup_duration) {
+        std::cout << "Circuit WarmUp" << std::endl;
         
+        int warmup_samples = static_cast<int>(warmup_duration / dt);
+        
+        this->input_voltage = 0.0; 
+        
+        for (int i = 0; i < warmup_samples; i++) {
+            runNewtonRaphson(dt); 
+        }
+        
+        std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
+        std::cout << std::endl;
+        
+        this->initCounters();
+    }
+    
     virtual void stampComponents(double dt) {
         for (auto& comp : circuit.components) {
             comp->stamp(G, I, V, dt);

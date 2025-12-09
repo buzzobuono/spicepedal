@@ -1,14 +1,14 @@
-// lv2_plugin.cpp - Circuit Simulator LV2 Plugin
+// lv2_plugin.cpp - SpicePedal LV2 Plugin
 #include <lv2/core/lv2.h>
 #include <cmath>
 #include <cstring>
 #include <iostream>
 #include <atomic>
 
-#include "circuit_solver.h"
 #include "circuit.h"
+#include "solvers/realtime_solver.h"
 
-#define PLUGIN_URI "http://github.com/buzzobuono/circuit_simulator"
+#define PLUGIN_URI "http://github.com/buzzobuono/spicepedal"
 
 // Port indices
 typedef enum {
@@ -18,83 +18,70 @@ typedef enum {
     PORT_BYPASS = 3
 } PortIndex;
 
-// Plugin instance
 typedef struct {
-    // Audio ports (provided by host)
-    const float* input;
-    float* output;
+
+    const double* input;
+    double* output;
     
-    // Control ports
-    const float* gain;
-    const float* bypass;
+    const double* gain;
+    const double* bypass;
     
-    // Circuit simulation
     Circuit* circuit;
-    CircuitSolver* solver;
-    
-    // Sample rate
+    RealTimeSolver* solver;
+
     double sample_rate;
     
-    // State
     std::atomic<float> last_gain;
     std::atomic<bool> last_bypass;
     bool initialized;
     
-    // Statistics (for debugging)
     uint64_t total_samples;
     uint32_t non_convergence_count;
     
 } CircuitPlugin;
 
-// ============================================
-// Instantiate - Called when plugin is loaded
-// ============================================
 static LV2_Handle instantiate(
     const LV2_Descriptor* descriptor,
-    double rate,
+    double sample_rate,
     const char* bundle_path,
     const LV2_Feature* const* features)
 {
     CircuitPlugin* plugin = new CircuitPlugin();
     
-    plugin->sample_rate = rate;
+    plugin->sample_rate = sample_rate;
     plugin->initialized = false;
     plugin->total_samples = 0;
     plugin->non_convergence_count = 0;
     plugin->last_gain.store(1.0f);
     plugin->last_bypass.store(false);
     
-    // Load circuit from bundle
     plugin->circuit = new Circuit();
-    std::string netlist_path = std::string(bundle_path) + "/circuits/bazz_fuss.cir";
+    std::string netlist_path = std::string(bundle_path) + "/circuits/fuzzes/bazz_fuss.cir";
     
     if (!plugin->circuit->loadNetlist(netlist_path)) {
-        std::cerr << "[Circuit Simulator LV2] ERROR: Failed to load netlist: " << std::endl;
-        
-        // Create a simple passthrough circuit as fallback
-        // (You might want to create a minimal working circuit here)
-        std::cerr << "[Circuit Simulator LV2] Using passthrough mode" << std::endl;
+        std::cerr << "SpicePedal ERROR: Failed to load netlist: " << std::endl;
+
         plugin->circuit = nullptr;
         plugin->solver = nullptr;
         return plugin;
     }
     
     try {
-        // Create solver with optimized parameters for real-time
-        plugin->solver = new CircuitSolver(
+        plugin->solver = new RealTimeSolver(
             *plugin->circuit,
-            rate,
+            sample_rate,
             25000,      // input impedance (25kΩ typical for guitar)
             15,         // max_iterations (reduced for real-time)
-            1e-6,       // tolerance (relaxed for speed)
-            0           // no warnings in plugin context
+            1e-6       // tolerance (relaxed for speed)
         );
         
-        std::cerr << "[Circuit Simulator LV2] 77 successfully @ " 
-                  << rate << " Hz" << std::endl;
+        plugin->solver->initialize();
+
+        std::cerr << "SpicePedal Loaded Successfully @ " 
+                  << sample_rate << " Hz" << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << "[Circuit Simulator LV2] ERROR: " << e.what() << std::endl;
+        std::cerr << "SpicePedal ERROR: " << e.what() << std::endl;
         delete plugin->circuit;
         plugin->circuit = nullptr;
         plugin->solver = nullptr;
@@ -115,16 +102,16 @@ static void connect_port(
     
     switch ((PortIndex)port) {
         case PORT_INPUT:
-            plugin->input = (const float*)data;
+            plugin->input = (const double*)data;
             break;
         case PORT_OUTPUT:
-            plugin->output = (float*)data;
+            plugin->output = (double*)data;
             break;
         case PORT_GAIN:
-            plugin->gain = (const float*)data;
+            plugin->gain = (const double*)data;
             break;
         case PORT_BYPASS:
-            plugin->bypass = (const float*)data;
+            plugin->bypass = (const double*)data;
             break;
     }
 }
@@ -141,46 +128,43 @@ static void activate(LV2_Handle instance)
         try {
             plugin->solver->initialize();
             plugin->initialized = true;
-            std::cerr << "[Circuit Simulator LV2] Circuit initialized" << std::endl;
+            std::cerr << "[SpicePedal LV2] Circuit initialized" << std::endl;
         } catch (const std::exception& e) {
-            std::cerr << "[Circuit Simulator LV2] Initialization error: " 
+            std::cerr << "[SpicePedal LV2] Initialization error: " 
                       << e.what() << std::endl;
         }
     }
 }
 
-// ============================================
-// Run - REAL-TIME AUDIO PROCESSING
-// THIS MUST COMPLETE IN < n_samples/sample_rate SECONDS!
-// ============================================
 static void run(LV2_Handle instance, uint32_t n_samples)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
     
-    const float* input = plugin->input;
-    float* output = plugin->output;
+    const double* input = plugin->input;
+    double* output = plugin->output;
     
     // Read control parameters
-    float gain = *(plugin->gain);
+    double gain = *(plugin->gain);
     bool bypass = (*(plugin->bypass) > 0.5f);
     
     // Bypass mode - simple passthrough
     if (bypass || !plugin->solver) {
         // Just copy input to output
-        std::memcpy(output, input, n_samples * sizeof(float));
+        std::memcpy(output, input, n_samples * sizeof(double));
         return;
     }
     
-    // Process audio through circuit simulator
+    // Process audio through SpicePedal
     for (uint32_t i = 0; i < n_samples; ++i) {
         // Input: scale from [-1, 1] to voltage range
         // Assuming your solver expects [-1, 1] volt range
         double vin = static_cast<double>(input[i]) * gain;
         
-        // Solve circuit
-        bool converged = plugin->solver->solve(vin);
+        plugin->solver->setInputVoltage(vin);
+
+        bool converged = plugin->solver->solve();
         
-        float vout = 0.0f;
+        double vout = 0.0f;
         if (converged) {
             vout = static_cast<float>(plugin->solver->getOutputVoltage());
         } else {
@@ -206,7 +190,7 @@ static void run(LV2_Handle instance, uint32_t n_samples)
     static uint64_t last_report = 0;
     if (plugin->total_samples - last_report > plugin->sample_rate * 10) {
         if (plugin->non_convergence_count > 0) {
-            std::cerr << "[Circuit Simulator LV2] Non-convergences: " 
+            std::cerr << "[SpicePedal LV2] Non-convergences: " 
                       << plugin->non_convergence_count 
                       << " / " << plugin->total_samples 
                       << " (" << (100.0 * plugin->non_convergence_count / plugin->total_samples) 
@@ -223,11 +207,11 @@ static void deactivate(LV2_Handle instance)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
     
-    std::cerr << "[Circuit Simulator LV2] Deactivated. Total samples: " 
+    std::cerr << "[SpicePedal LV2] Deactivated. Total samples: " 
               << plugin->total_samples << std::endl;
     
     if (plugin->non_convergence_count > 0) {
-        std::cerr << "[Circuit Simulator LV2] Total non-convergences: " 
+        std::cerr << "[SpicePedal LV2] Total non-convergences: " 
                   << plugin->non_convergence_count << std::endl;
     }
 }

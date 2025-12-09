@@ -11,7 +11,7 @@ LIBS_PORTAUDIO = -lportaudio
 LIBS_FFTW3 = -lfftw3
 
 # LV2 Plugin configuration
-PLUGIN_NAME = circuit_simulator
+PLUGIN_NAME = spicepedal
 PLUGIN_SO = $(PLUGIN_NAME).so
 LV2_BUNDLE = $(PLUGIN_NAME).lv2
 USER_LV2_DIR = $(HOME)/.lv2
@@ -41,9 +41,9 @@ install-lv2: lv2
 	@mkdir -p $(INSTALL_DIR)/circuits
 	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
 	@cp ttl/manifest.ttl $(INSTALL_DIR)/
-	@cp ttl/circuit_simulator.ttl $(INSTALL_DIR)/
-	@cp circuits/*.cir $(INSTALL_DIR)/circuits/
-	@echo "Test with: jalv.gtk http://github.com/buzzobuono/circuit_simulator"
+	@cp ttl/spicepedal.ttl $(INSTALL_DIR)/
+	@cp -r circuits/ $(INSTALL_DIR)/
+	@echo "Test with: jalv.gtk http://github.com/buzzobuono/spicepedal"
 
 uninstall-lv2:
 	rm -rf $(INSTALL_DIR)
@@ -59,7 +59,7 @@ test-lv2: install-lv2
 		exit 1; \
 	fi
 	@if command -v lv2ls >/dev/null 2>&1; then \
-		if lv2ls | grep -q "circuit_simulator"; then \
+		if lv2ls | grep -q "spicepedal"; then \
 			echo "✓ Plugin recognized by LV2"; \
 		else \
 			echo "⚠ Plugin not found in lv2ls"; \
