@@ -12,7 +12,6 @@
 #include "solvers/zin_solver.h"
 #include "solvers/zout_solver.h"
 #include "solvers/transient_solver.h"
-#include "tran_circuit_solver.h"
 
 class SpicePedalProcessor
 {
@@ -133,7 +132,7 @@ public:
             std::cout << "  Solver's Mean Iterations: " << zout_solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
             return true;
-        } else if (analysis_type == "TRAN" || analysis_type == "TEST") {
+        } else if (analysis_type == "TRAN") {
             std::vector<double> signalIn;
             if (!input_file.empty()) {
                 std::cout << "Circuit input: File" << std::endl;
@@ -246,22 +245,12 @@ public:
             
             for (double& s : signalIn) s *= scale;
             
-            std::unique_ptr<TranCircuitSolver> tran_solver = std::make_unique<TranCircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
-
             std::unique_ptr<TransientSolver> transient_solver = std::make_unique<TransientSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
-
-            if (analysis_type == "TRAN") {
-                if (!bypass) {
-                    tran_solver->initialize();
-                    std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                    tran_solver->printDCOperatingPoint();
-                }
-            } else if (analysis_type == "TEST") {
-                if (!bypass) {
-                    transient_solver->initialize();
-                    std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                    transient_solver->printDCOperatingPoint();
-                }
+            
+            if (!bypass) {
+                transient_solver->initialize();
+                std::cout << "Circuit initialized with this Operating Point" << std::endl;
+                transient_solver->printDCOperatingPoint();
             }
             
             std::vector<double> signalOut(signalIn.size());
@@ -272,30 +261,15 @@ public:
             auto start = std::chrono::high_resolution_clock::now();
     
             for (size_t i = 0; i < signalIn.size(); i++) {
-                if (analysis_type == "TRAN") {
-                    if (!bypass) {
-                        signalOut[i] = 0;
-                        tran_solver->setInputVoltage(signalIn[i]);
-                        if (tran_solver->solve()) {
-                            signalOut[i] = tran_solver->getOutputVoltage();
-                        }
-                    } else {
-                        signalOut[i] = signalIn[i];
+                if (!bypass) {
+                    signalOut[i] = 0;
+                    transient_solver->setInputVoltage(signalIn[i]);
+                    if (transient_solver->solve()) {
+                        signalOut[i] = transient_solver->getOutputVoltage();
                     }
-                 
-                } else if (analysis_type == "TEST") {
-                    if (!bypass) {
-                        signalOut[i] = 0;
-                        transient_solver->setInputVoltage(signalIn[i]);
-                        if (transient_solver->solve()) {
-                            signalOut[i] = transient_solver->getOutputVoltage();
-                        }
-                    } else {
-                        signalOut[i] = signalIn[i];
-                    }
-                    
+                } else {
+                    signalOut[i] = signalIn[i];
                 }
-                    
                 
                 // Update statistics
                 peak_in = std::max(peak_in, std::abs(signalIn[i]));
@@ -313,30 +287,8 @@ public:
             for (double v : signalOut) {
                 outputPeak = std::max(outputPeak, std::abs(v));
             }
-            if (analysis_type == "TRAN") {
-                std::cout << "Simulation ended with this Operating Point" << std::endl;
-            tran_solver->printDCOperatingPoint();
-            
-            // Print statistics
-            std::cout << "Audio Statistics:" << std::endl;
-            std::cout << "  Mean Input Signal " << mean << std::endl;
-            std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
-            std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
-            std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
-            std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
-            std::cout << std::endl;
-            
-            std::cout << "Process Statistics:" << std::endl;
-            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << tran_solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << tran_solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << tran_solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << tran_solver->getMeanIterations() << std::endl;
-            std::cout << std::endl;
-                
-            } else if (analysis_type == "TEST") {
-                
-                std::cout << "Simulation ended with this Operating Point" << std::endl;
+             
+            std::cout << "Simulation ended with this Operating Point" << std::endl;
             transient_solver->printDCOperatingPoint();
             
             // Print statistics
@@ -355,8 +307,6 @@ public:
             std::cout << "  Solver's Total Iterations: " << transient_solver->getTotalIterations() << std::endl;
             std::cout << "  Solver's Mean Iterations: " << transient_solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
-            }
-            
             
             if (!output_file.empty()) {
                 writeWav(signalOut, output_file, sample_rate);
