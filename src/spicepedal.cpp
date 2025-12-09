@@ -8,10 +8,10 @@
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
+#include "solvers/dc_solver.h"
+#include "solvers/zin_solver.h"
+#include "solvers/zout_solver.h"
 #include "tran_circuit_solver.h"
-#include "dc_circuit_solver.h"
-#include "zin_circuit_solver.h"
-#include "zout_circuit_solver.h"
 
 class SpicePedalProcessor
 {
@@ -21,7 +21,7 @@ private:
     double sample_rate;
     int input_frequency;
     double input_duration;
-    double max_input_voltage;
+    double input_amplitude;
     bool frequency_sweep;
     int source_impedance;
     bool bypass;
@@ -34,7 +34,7 @@ public:
                      double sample_rate,
                      int input_frequency,
                      double input_duration,
-                     double max_input_voltage,
+                     double input_amplitude,
                      bool frequency_sweep,
                      int source_impedance,
                      bool bypass,
@@ -45,7 +45,7 @@ public:
           sample_rate(sample_rate),
           input_frequency(input_frequency),
           input_duration(input_duration),
-          max_input_voltage(max_input_voltage),
+          input_amplitude(input_amplitude),
           frequency_sweep(frequency_sweep),
           source_impedance(source_impedance),
           bypass(bypass),
@@ -65,7 +65,11 @@ public:
         double scale = 1;
         if (analysis_type == "DC") {
             std::cout << "DC Analysis" << std::endl;
-            std::unique_ptr<DCCircuitSolver> dc_solver = std::make_unique<DCCircuitSolver>(circuit, max_iterations, tolerance);
+            std::unique_ptr<DCSolver> dc_solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
+            
+            dc_solver->initialize();
+            
+            dc_solver->setInputVoltage(input_amplitude);
             
             auto start = std::chrono::high_resolution_clock::now();
             if (!dc_solver->solve()) {
@@ -84,9 +88,12 @@ public:
             std::cout << std::endl;
 
             return true;
-        } else if (analysis_type == "ZIn") {
+        } else if (analysis_type == "ZIN") {
             std::cout << "ZIn Analysis" << std::endl;
-            std::unique_ptr<ZInCircuitSolver> zin_solver = std::make_unique<ZInCircuitSolver>(circuit, sample_rate, source_impedance, input_frequency, input_duration, max_iterations, tolerance);
+            std::unique_ptr<ZInSolver> zin_solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            
+            zin_solver->initialize();
+            
             auto start = std::chrono::high_resolution_clock::now();
             if (!zin_solver->solve()) {
                 std::cerr << "   ERROR: Zin Analysis not convergent after " << max_iterations << " iterations" << std::endl;
@@ -103,9 +110,12 @@ public:
             std::cout << "  Solver's Mean Iterations: " << zin_solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
             return true;
-        }  else if (analysis_type == "ZOut") {
+        } else if (analysis_type == "ZOUT") {
             std::cout << "ZOut Analysis" << std::endl;
-            std::unique_ptr<ZOutCircuitSolver> zout_solver = std::make_unique<ZOutCircuitSolver>(circuit, sample_rate, source_impedance, max_input_voltage, input_frequency, input_duration, max_iterations, tolerance);
+            std::unique_ptr<ZOutSolver> zout_solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            
+            zout_solver->initialize();
+            
             auto start = std::chrono::high_resolution_clock::now();
             if (!zout_solver->solve()) {
                 std::cerr << "   ERROR: Zout Analysis not convergent after " << max_iterations << " iterations" << std::endl;
@@ -169,7 +179,7 @@ public:
                 }
                 
                 if (maxNormalized > 1e-10) {
-                    scale = max_input_voltage / maxNormalized;
+                    scale = input_amplitude / maxNormalized;
                 }
             } else if (frequency_sweep) {
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
@@ -186,7 +196,7 @@ public:
                         double t = i / sample_rate;
                         // Fase per sweep logaritmico: integrale di f(t) = f_start * exp(k*t)
                         double phase = 2.0 * M_PI * f_start * (std::exp(k * t) - 1.0) / k;
-                        signalIn[i] = max_input_voltage * std::sin(phase);
+                        signalIn[i] = input_amplitude * std::sin(phase);
                     }
                     std::cout << "Logarithmic sweep: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
                 } else {
@@ -196,7 +206,7 @@ public:
                         double t = i / sample_rate;
                         // Fase per sweep lineare: integrale di f(t) = f_start + k*t
                         double phase = 2.0 * M_PI * (f_start * t + 0.5 * k * t * t);
-                        signalIn[i] = max_input_voltage * std::sin(phase);
+                        signalIn[i] = input_amplitude * std::sin(phase);
                     }
                     std::cout << "Linear sweep: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
                 }
@@ -204,7 +214,7 @@ public:
                 // DC offset
                 mean = 0;
                  // maxNormalized
-                maxNormalized = max_input_voltage;
+                maxNormalized = input_amplitude;
 
             } else if (input_frequency > 0) {
                 std::cout << "Circuit input: Sinusoid" << std::endl;
@@ -212,24 +222,24 @@ public:
                 signalIn.resize(total_samples, 0.0f);
                 for (size_t i = 0; i < total_samples; ++i) {
                     double t = i / sample_rate;
-                    signalIn[i] = max_input_voltage * std::sin(2.0 * M_PI * input_frequency * t);
+                    signalIn[i] = input_amplitude * std::sin(2.0 * M_PI * input_frequency * t);
                 }
                 // DC offset
                 mean = 0;
                 // maxNormalized
-                maxNormalized = max_input_voltage;
+                maxNormalized = input_amplitude;
 
             } else {
                 std::cout << "Circuit input: DC" << std::endl;
                 size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
                 signalIn.resize(total_samples, 0.0f);
                 for (size_t i = 0; i < total_samples; ++i) {
-                    signalIn[i] = max_input_voltage;
+                    signalIn[i] = input_amplitude;
                 }
                 // Calcola DC offset
-                mean = max_input_voltage;
+                mean = input_amplitude;
                  // maxNormalized
-                maxNormalized = max_input_voltage;
+                maxNormalized = input_amplitude;
             }
             std::cout << std::endl;
             
@@ -402,7 +412,7 @@ int main(int argc, char *argv[]) {
     std::string input_file;
     int input_frequency = 0;
     double input_duration = 2.0;
-    double max_input_voltage = 0.15;
+    double input_amplitude = 0.15;
     bool frequency_sweep = false;
     int source_impedance = 25000;
     int sample_rate = 44100;
@@ -412,12 +422,12 @@ int main(int argc, char *argv[]) {
     int max_iterations = 20;
     double tolerance = 1e-6;
     
-    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC", "ZIn", "ZOut"}))->default_val(analysis_type);
+    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC", "ZIN", "ZOUT", "TEST"}))->default_val(analysis_type);
     
     app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
-    app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0, 5.0))->default_val(max_input_voltage);
+    app.add_option("-v,--input-amplitude", input_amplitude, "Input Amplitude")->check(CLI::Range(-5.0, 5.0))->default_val(input_amplitude);
     app.add_flag("-F,--frequency-sweep", frequency_sweep, "Frequency Sweep")->default_val(frequency_sweep);
     app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
@@ -437,7 +447,7 @@ int main(int argc, char *argv[]) {
     std::cout << "   Input File: " << input_file << std::endl;
     std::cout << "   Input Frequency: " << input_frequency << "Hz" << std::endl;
     std::cout << "   Input Duration: " << input_duration << "s" << std::endl;
-    std::cout << "   Input Voltage Amplitude: " << max_input_voltage << "V" << std::endl;
+    std::cout << "   Input Amplitude: " << input_amplitude << "V" << std::endl;
     std::cout << "   Source Impedance: " << source_impedance << "Ω" << std::endl;
     std::cout << "   Frequency Sweep: " << (frequency_sweep ? "True" : "False") << std::endl;
     std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
@@ -449,7 +459,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, frequency_sweep, source_impedance, bypass, max_iterations, tolerance);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, input_amplitude, frequency_sweep, source_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }
