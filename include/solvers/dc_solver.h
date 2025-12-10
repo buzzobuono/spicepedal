@@ -42,20 +42,9 @@ class DCSolver : public NewtonRaphsonSolver {
     }
     
     public:
-
-    void setInputVoltage(double vin) {
-        this->input_voltage = vin;
-    }
     
-    double getOutputVoltage() const {
-        return V(circuit.output_node);
-    }
-    
-    void printDCOperatingPoint() {
-        for (int i = 0; i < circuit.num_nodes; i++) {
-            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
-        }
-        std::cout << std::endl;
+    void printResult() override {
+        NewtonRaphsonSolver::printDCOperatingPoint();
     }
 };
 

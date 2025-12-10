@@ -8,6 +8,7 @@
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
+#include "solvers/newton_raphson_solver.h"
 #include "solvers/dc_solver.h"
 #include "solvers/zin_solver.h"
 #include "solvers/zout_solver.h"
@@ -63,74 +64,42 @@ public:
         double mean = 0.0f;
         double maxNormalized = 0.0;
         double scale = 1;
+        std::unique_ptr<NewtonRaphsonSolver> solver;
         if (analysis_type == "DC") {
             std::cout << "DC Analysis" << std::endl;
-            std::unique_ptr<DCSolver> dc_solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
-            
-            dc_solver->initialize();
-            
-            dc_solver->setInputVoltage(input_amplitude);
-            
+            solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
+            solver->initialize();
             auto start = std::chrono::high_resolution_clock::now();
-            if (!dc_solver->solve()) {
+            if (!solver->solve()) {
                 std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
             auto end = std::chrono::high_resolution_clock::now();
-            
-            dc_solver->printDCOperatingPoint();
-
-            std::cout << "Process Statistics:" << std::endl;
-            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << dc_solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << dc_solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << dc_solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << dc_solver->getMeanIterations() << std::endl;
-            std::cout << std::endl;
-
+            printAnalysisResult(solver);
+            printProcessStatistics(solver);
             return true;
         } else if (analysis_type == "ZIN") {
             std::cout << "ZIn Analysis" << std::endl;
-            std::unique_ptr<ZInSolver> zin_solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
-            
-            zin_solver->initialize();
-            
+            solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            solver->initialize();
             auto start = std::chrono::high_resolution_clock::now();
-            if (!zin_solver->solve()) {
+            if (!solver->solve()) {
                 std::cerr << "   ERROR: Zin Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
             auto end = std::chrono::high_resolution_clock::now();
-            
-            zin_solver->printInputImpedance();
-
-            std::cout << "Process Statistics:" << std::endl;
-            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << zin_solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << zin_solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << zin_solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << zin_solver->getMeanIterations() << std::endl;
-            std::cout << std::endl;
+            printAnalysisResult(solver);
+            printProcessStatistics(solver);
             return true;
         } else if (analysis_type == "ZOUT") {
             std::cout << "ZOut Analysis" << std::endl;
-            std::unique_ptr<ZOutSolver> zout_solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
-            
-            zout_solver->initialize();
-            
+            solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            solver->initialize();
             auto start = std::chrono::high_resolution_clock::now();
-            if (!zout_solver->solve()) {
+            if (!solver->solve()) {
                 std::cerr << "   ERROR: Zout Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
             auto end = std::chrono::high_resolution_clock::now();
-            
-            zout_solver->printOutputImpedance();
-
-            std::cout << "Process Statistics:" << std::endl;
-            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << zout_solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << zout_solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << zout_solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << zout_solver->getMeanIterations() << std::endl;
-            std::cout << std::endl;
+            printAnalysisResult(solver);
+            printProcessStatistics(solver);
             return true;
         } else if (analysis_type == "TRAN") {
             std::vector<double> signalIn;
@@ -245,12 +214,12 @@ public:
             
             for (double& s : signalIn) s *= scale;
             
-            std::unique_ptr<TransientSolver> transient_solver = std::make_unique<TransientSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+            solver = std::make_unique<TransientSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
             
             if (!bypass) {
-                transient_solver->initialize();
+                solver->initialize();
                 std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                transient_solver->printDCOperatingPoint();
+                solver->printDCOperatingPoint();
             }
             
             std::vector<double> signalOut(signalIn.size());
@@ -263,9 +232,9 @@ public:
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
-                    transient_solver->setInputVoltage(signalIn[i]);
-                    if (transient_solver->solve()) {
-                        signalOut[i] = transient_solver->getOutputVoltage();
+                    solver->setInputVoltage(signalIn[i]);
+                    if (solver->solve()) {
+                        signalOut[i] = solver->getOutputVoltage();
                     }
                 } else {
                     signalOut[i] = signalIn[i];
@@ -289,7 +258,7 @@ public:
             }
              
             std::cout << "Simulation ended with this Operating Point" << std::endl;
-            transient_solver->printDCOperatingPoint();
+            solver->printDCOperatingPoint();
             
             // Print statistics
             std::cout << "Audio Statistics:" << std::endl;
@@ -300,13 +269,7 @@ public:
             std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
             std::cout << std::endl;
             
-            std::cout << "Process Statistics:" << std::endl;
-            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
-            std::cout << "  Solver's Failure Percentage: " << transient_solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Total Samples: " << transient_solver->getTotalSamples() << std::endl;
-            std::cout << "  Solver's Total Iterations: " << transient_solver->getTotalIterations() << std::endl;
-            std::cout << "  Solver's Mean Iterations: " << transient_solver->getMeanIterations() << std::endl;
-            std::cout << std::endl;
+            printProcessStatistics(solver);
             
             if (!output_file.empty()) {
                 writeWav(signalOut, output_file, sample_rate);
@@ -316,6 +279,20 @@ public:
             std::cerr << "Analysis Type not valid: " << analysis_type << std::endl;
             return false;
         }
+    }
+    
+    void printAnalysisResult(std::unique_ptr<NewtonRaphsonSolver>& solver) {
+        solver->printResult();
+    }
+    
+    void printProcessStatistics(std::unique_ptr<NewtonRaphsonSolver>& solver) {
+        std::cout << "Process Statistics:" << std::endl;
+        //std::cout << "  Solver's Execution Time: " << solver->getExecutionTime() << " us" << std::endl;
+        std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
+        std::cout << "  Solver's Total Samples: " << solver->getTotalSamples() << std::endl;
+        std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;
+        std::cout << "  Solver's Mean Iterations: " << solver->getMeanIterations() << std::endl;
+        std::cout << std::endl;
     }
 
     bool writeWav(std::vector<double> signalOut,
@@ -429,7 +406,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
     app.add_option("-v,--input-amplitude", input_amplitude, "Input Amplitude")->check(CLI::Range(-5.0, 5.0))->default_val(input_amplitude);
     app.add_flag("-F,--frequency-sweep", frequency_sweep, "Frequency Sweep")->default_val(frequency_sweep);
-    app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
+    app.add_option("-I,--source-impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     
     app.add_option("-o,--output-file", output_file, "Output File");

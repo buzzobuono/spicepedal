@@ -125,6 +125,15 @@ class NewtonRaphsonSolver : public Solver {
         input_voltage = vin;
     }
     
+    virtual void printResult() = 0;
+    
+    void printDCOperatingPoint() {
+        for (int i = 0; i < circuit.num_nodes; i++) {
+            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    
     bool reset() override {
         V.setZero();
         G.setZero();

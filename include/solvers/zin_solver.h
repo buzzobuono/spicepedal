@@ -101,7 +101,7 @@ class ZInSolver : public NewtonRaphsonSolver {
         return true;
     }
     
-    void printInputImpedance() const {
+    void printResult() override {
         std::cout << "   " << std::fixed << std::setprecision(1) << input_frequency << " Hz: "
                   << std::setprecision(2) << (Z_magnitude / 1000.0) << " k\u03A9, "
                   << std::setprecision(1) << Z_phase << "°" << std::endl;

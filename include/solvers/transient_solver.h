@@ -126,11 +126,8 @@ class TransientSolver : public NewtonRaphsonSolver {
         }
     }
     
-    void printDCOperatingPoint() {
-        for (int i = 0; i < circuit.num_nodes; i++) {
-            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
-        }
-        std::cout << std::endl;
+    void printResult() override {
+        
     }
     
 };
