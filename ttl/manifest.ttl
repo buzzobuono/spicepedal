@@ -3,5 +3,5 @@
 
 <http://github.com/buzzobuono/spicepedal>
     a lv2:Plugin ;
-    lv2:binary <spicelpedal.so> ;
-    rdfs:seeAlso <spicelpedal.ttl> .
+    lv2:binary <spicepedal.so> ;
+    rdfs:seeAlso <spicepedal.ttl> .
