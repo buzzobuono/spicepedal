@@ -37,7 +37,11 @@ class RealTimeSolver : public NewtonRaphsonSolver {
         return true;
     }
 
-    bool solve() override {
+    bool solve() {
+        return solveImpl();
+    }
+
+    bool solveImpl() override {
         return runNewtonRaphson(dt);
     }
     

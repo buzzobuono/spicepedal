@@ -23,7 +23,7 @@ class DCSolver : public NewtonRaphsonSolver {
     
     ~DCSolver() override = default;
     
-    bool solve() override {
+    bool solveImpl() override {
         return runNewtonRaphson(0.0);
     }
     
@@ -44,7 +44,7 @@ class DCSolver : public NewtonRaphsonSolver {
     public:
     
     void printResult() override {
-        NewtonRaphsonSolver::printDCOperatingPoint();
+        
     }
 };
 

@@ -127,11 +127,8 @@ class NewtonRaphsonSolver : public Solver {
     
     virtual void printResult() = 0;
     
-    void printDCOperatingPoint() {
-        for (int i = 0; i < circuit.num_nodes; i++) {
-            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
-        }
-        std::cout << std::endl;
+    Eigen::VectorXd getNodeVoltages() {
+        return V;
     }
     
     bool reset() override {

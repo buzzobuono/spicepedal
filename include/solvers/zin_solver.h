@@ -42,7 +42,7 @@ class ZInSolver : public NewtonRaphsonSolver {
 
     ~ZInSolver() override = default;
     
-    bool solve() override {
+    bool solveImpl() override {
         double sample_rate = 1 / dt;
         int num_samples = static_cast<int>(std::ceil(input_duration * sample_rate));
         
@@ -97,7 +97,7 @@ class ZInSolver : public NewtonRaphsonSolver {
         
         Z_magnitude = std::abs(Z_in);
         Z_phase = std::arg(Z_in) * 180.0 / M_PI; // in gradi
-
+        
         return true;
     }
     
@@ -107,7 +107,7 @@ class ZInSolver : public NewtonRaphsonSolver {
                   << std::setprecision(1) << Z_phase << "°" << std::endl;
         std::cout << std::endl;
     }
-    
+        
     double getZMagnitude() const {
         return Z_magnitude;
     }

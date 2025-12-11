@@ -56,7 +56,7 @@ static LV2_Handle instantiate(
     plugin->last_bypass.store(false);
     
     plugin->circuit = new Circuit();
-    std::string netlist_path = std::string(bundle_path) + "/circuits/fuzzes/bazz_fuss.cir";
+    std::string netlist_path = std::string(bundle_path) + "/circuits/fuzzes/bazz-fuss.cir";
     
     if (!plugin->circuit->loadNetlist(netlist_path)) {
         std::cerr << "SpicePedal ERROR: Failed to load netlist: " << std::endl;

@@ -50,7 +50,7 @@ class TransientSolver : public NewtonRaphsonSolver {
         return true;
     }
 
-    bool solve() override {
+    bool solveImpl() override {
         bool success = runNewtonRaphson(dt);
         
         logProbes(); 

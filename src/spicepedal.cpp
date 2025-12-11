@@ -77,11 +77,10 @@ public:
             std::cout << "DC Analysis" << std::endl;
             solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
             solver->initialize();
-            auto start = std::chrono::high_resolution_clock::now();
             if (!solver->solve()) {
                 std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
-            auto end = std::chrono::high_resolution_clock::now();
+            printDCOperatingPoints(solver);
             printAnalysisResult(solver);
             printProcessStatistics(solver);
             return true;
@@ -89,11 +88,9 @@ public:
             std::cout << "ZIn Analysis" << std::endl;
             solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
             solver->initialize();
-            auto start = std::chrono::high_resolution_clock::now();
             if (!solver->solve()) {
                 std::cerr << "   ERROR: Zin Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
-            auto end = std::chrono::high_resolution_clock::now();
             printAnalysisResult(solver);
             printProcessStatistics(solver);
             return true;
@@ -101,11 +98,9 @@ public:
             std::cout << "ZOut Analysis" << std::endl;
             solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
             solver->initialize();
-            auto start = std::chrono::high_resolution_clock::now();
             if (!solver->solve()) {
                 std::cerr << "   ERROR: Zout Analysis not convergent after " << max_iterations << " iterations" << std::endl;
             }
-            auto end = std::chrono::high_resolution_clock::now();
             printAnalysisResult(solver);
             printProcessStatistics(solver);
             return true;
@@ -198,7 +193,7 @@ public:
             if (!bypass) {
                 solver->initialize();
                 std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                solver->printDCOperatingPoint();
+                printDCOperatingPoints(solver);
             }
             
             std::vector<double> signalOut(signalIn.size());
@@ -206,8 +201,6 @@ public:
             double peak_in = 0.0, peak_out = 0.0;
             double rms_in = 0.0, rms_out = 0.0;
             
-            auto start = std::chrono::high_resolution_clock::now();
-    
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
@@ -226,8 +219,6 @@ public:
                 rms_out += signalOut[i] * signalOut[i];
             }
             
-            auto end = std::chrono::high_resolution_clock::now();
-            
             rms_in = std::sqrt(rms_in / signalIn.size());
             rms_out = std::sqrt(rms_out / signalIn.size());
             
@@ -237,7 +228,7 @@ public:
             }
              
             std::cout << "Simulation ended with this Operating Point" << std::endl;
-            solver->printDCOperatingPoint();
+            printDCOperatingPoints(solver);
             
             // Print statistics
             std::cout << "Audio Statistics:" << std::endl;
@@ -264,9 +255,16 @@ public:
         solver->printResult();
     }
     
+    void printDCOperatingPoints(std::unique_ptr<NewtonRaphsonSolver>& solver) {
+        for (int i = 0; i < solver->getNodeVoltages().size(); i++) {
+            std::cout << "   Node " << i << ": " << solver->getNodeVoltages()(i) << " V" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
     void printProcessStatistics(std::unique_ptr<NewtonRaphsonSolver>& solver) {
         std::cout << "Process Statistics:" << std::endl;
-        //std::cout << "  Solver's Execution Time: " << solver->getExecutionTime() << " us" << std::endl;
+        std::cout << "  Solver's Execution Time: " << solver->getExecutionTime() << " us" << std::endl;
         std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
         std::cout << "  Solver's Total Samples: " << solver->getTotalSamples() << std::endl;
         std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;

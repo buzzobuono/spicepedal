@@ -51,7 +51,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
     ~ZOutSolver() override = default;
     
-    bool solve() override {
+    bool solveImpl() override {
         double sample_rate = 1.0 / dt; 
 
         int num_samples = static_cast<int>(std::ceil(input_duration * sample_rate));
