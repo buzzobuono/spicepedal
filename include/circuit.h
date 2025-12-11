@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <locale>
 
-#include "component.h"
+#include "components/component.h"
 #include "components/voltage.h"
 #include "components/resistor.h"
 #include "components/capacitor.h"

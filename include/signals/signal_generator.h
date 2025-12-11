@@ -18,6 +18,8 @@ class SignalGenerator {
     
     virtual double getMaxNormalized() const { return 0.0; }
     
+    virtual double getSampleRate() const { return 0.0; }
+
     virtual void printInfo() const = 0;
     
 };

@@ -52,8 +52,6 @@ class ZOutSolver : public NewtonRaphsonSolver {
     ~ZOutSolver() override = default;
     
     bool solveImpl() override {
-        double sample_rate = 1.0 / dt; 
-
         int num_samples = static_cast<int>(std::ceil(input_duration * sample_rate));
         
         if (num_samples <= 4) num_samples = std::max(8, num_samples);
@@ -146,6 +144,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
     }
 
     void printResult() override {
+        std::cout << "Output Impedence Analysis" << std::endl;
         std::cout << "   " << std::fixed << std::setprecision(1) << input_frequency << " Hz: "
                   << std::setprecision(2) << (Z_magnitude / 1000.0) << " kΩ, "
                   << std::setprecision(1) << Z_phase << "°" << std::endl;

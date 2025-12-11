@@ -44,7 +44,8 @@ class DCSolver : public NewtonRaphsonSolver {
     public:
     
     void printResult() override {
-        
+        std::cout << "DC Analysis" << std::endl;
+        printDCOperatingPoints();
     }
 };
 

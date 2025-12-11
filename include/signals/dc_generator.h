@@ -37,10 +37,15 @@ class DCGenerator : public SignalGenerator {
         return input_amplitude;
     }
 
+    double getSampleRate() const override {
+        return sample_rate;
+    }
+
     void printInfo() const override {
         std::cout << "Circuit input: DC" << std::endl;
         std::cout << "   Amplitude: " << input_amplitude << " V" << std::endl;
         std::cout << "   Duration: " << input_duration << " s" << std::endl;
+        std::cout << std::endl;
     }
     
 };

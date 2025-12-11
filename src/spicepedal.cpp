@@ -14,10 +14,12 @@
 #include "solvers/zout_solver.h"
 #include "solvers/transient_solver.h"
 #include "signals/signal_generator.h"
-#include "signals/dc_generator.h"
+#include "signals/file_input_generator.h"
 #include "signals/sinusoid_generator.h"
 #include "signals/logarithmic_frequency_sweep_generator.h"
 #include "signals/linear_frequency_sweep_generator.h"
+#include "signals/dc_generator.h"
+#include "utils/wav_helper.h"
 
 class SpicePedalProcessor
 {
@@ -73,127 +75,48 @@ public:
         double maxNormalized = 0.0;
         double scale = 1;
         std::unique_ptr<NewtonRaphsonSolver> solver;
-        if (analysis_type == "DC") {
-            std::cout << "DC Analysis" << std::endl;
-            solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
+        if (analysis_type != "TRAN") {
+            if (analysis_type == "DC") {
+                solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
+            } else if (analysis_type == "ZIN") {
+                solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            } else if (analysis_type == "ZOUT") {
+                solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            }
             solver->initialize();
             if (!solver->solve()) {
-                std::cerr << "   ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
+                std::cerr << "   ERROR: Solver not convergent after " << max_iterations << " iterations" << std::endl;
+                return 1;
             }
-            printDCOperatingPoints(solver);
-            printAnalysisResult(solver);
-            printProcessStatistics(solver);
-            return true;
-        } else if (analysis_type == "ZIN") {
-            std::cout << "ZIn Analysis" << std::endl;
-            solver = std::make_unique<ZInSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
-            solver->initialize();
-            if (!solver->solve()) {
-                std::cerr << "   ERROR: Zin Analysis not convergent after " << max_iterations << " iterations" << std::endl;
-            }
-            printAnalysisResult(solver);
-            printProcessStatistics(solver);
-            return true;
-        } else if (analysis_type == "ZOUT") {
-            std::cout << "ZOut Analysis" << std::endl;
-            solver = std::make_unique<ZOutSolver>(circuit, sample_rate, source_impedance, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
-            solver->initialize();
-            if (!solver->solve()) {
-                std::cerr << "   ERROR: Zout Analysis not convergent after " << max_iterations << " iterations" << std::endl;
-            }
-            printAnalysisResult(solver);
-            printProcessStatistics(solver);
-            return true;
         } else if (analysis_type == "TRAN") {
             std::unique_ptr<SignalGenerator> signal_generator;
-            
             std::vector<double> signalIn;
+            
             if (!input_file.empty()) {
-                std::cout << "Circuit input: File" << std::endl;
-                // Open Input WAV
-                SF_INFO sfInfo;
-                sfInfo.format = 0;
-                SNDFILE* file = sf_open(input_file.c_str(), SFM_READ, &sfInfo);
-                
-                if (!file) {
-                    std::cerr << "Errore apertura WAV: " << sf_strerror(file) << std::endl;
-                    return false;
-                }
-                
-                std::cout << "Input File Format" << std::endl;
-                printFileFormat(input_file);
-                
-                if (sample_rate) sample_rate = sfInfo.samplerate;
-                
-                // Leggi tutti i sample
-                std::vector<double> buffer(sfInfo.frames * sfInfo.channels);
-                sf_count_t numFrames = sf_readf_double(file, buffer.data(), sfInfo.frames);
-                sf_close(file);
-                
-                if (numFrames != sfInfo.frames) {
-                    std::cerr << "Errore lettura sample" << std::endl;
-                    return false;
-                }
-                
-                // Estrai canale sinistro
-                signalIn.resize(numFrames, 0.0f);
-                for (sf_count_t i = 0; i < numFrames; i++) {
-                    signalIn[i] = buffer[i * sfInfo.channels];
-                }
-
-                // Calcola e rimuovi DC offset 
-                for (double s : signalIn) mean += s;
-                mean /= signalIn.size();
-
-                for (double& s : signalIn) s -= mean;
-
-                // Calcola maxNormalized e Normalizza in Volt
-                for (double s : signalIn) {
-                    maxNormalized = std::max(maxNormalized, std::abs(s));
-                }
-                
-                if (maxNormalized > 1e-10) {
-                    scale = input_amplitude / maxNormalized;
-                }
+                signal_generator = std::make_unique<FileInputGenerator>(input_file, input_amplitude);
             } else if (frequency_sweep_log) {
                 signal_generator = std::make_unique<LogarithmicFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
-                signal_generator->printInfo();
-                signalIn = signal_generator->generate();
-                mean = signal_generator->getMean();
-                maxNormalized = signal_generator->getMaxNormalized();
-                scale = signal_generator->getScaleFactor();
             } else if (frequency_sweep_lin) {
                 signal_generator = std::make_unique<LinearFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
-                signal_generator->printInfo();
-                signalIn = signal_generator->generate();
-                mean = signal_generator->getMean();
-                maxNormalized = signal_generator->getMaxNormalized();
-                scale = signal_generator->getScaleFactor();
             } else if (input_frequency > 0) {
                 signal_generator = std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude);
-                signal_generator->printInfo();
-                signalIn = signal_generator->generate();
-                mean = signal_generator->getMean();
-                maxNormalized = signal_generator->getMaxNormalized();
-                scale = signal_generator->getScaleFactor();
             } else {
                 signal_generator = std::make_unique<DCGenerator>(sample_rate, input_duration, input_amplitude);
-                signal_generator->printInfo();
-                signalIn = signal_generator->generate();
-                mean = signal_generator->getMean();
-                maxNormalized = signal_generator->getMaxNormalized();
-                scale = signal_generator->getScaleFactor();
             }
-            std::cout << std::endl;
             
-            for (double& s : signalIn) s *= scale;
+            signal_generator->printInfo();
+            signalIn = signal_generator->generate();
+            sample_rate = signal_generator->getSampleRate();
+            mean = signal_generator->getMean();
+            maxNormalized = signal_generator->getMaxNormalized();
+            scale = signal_generator->getScaleFactor();
             
             solver = std::make_unique<TransientSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
             
             if (!bypass) {
                 solver->initialize();
                 std::cout << "Circuit initialized with this Operating Point" << std::endl;
-                printDCOperatingPoints(solver);
+                solver->printDCOperatingPoints();
             }
             
             std::vector<double> signalOut(signalIn.size());
@@ -228,135 +151,26 @@ public:
             }
              
             std::cout << "Simulation ended with this Operating Point" << std::endl;
-            printDCOperatingPoints(solver);
+            solver->printDCOperatingPoints();
             
-            // Print statistics
-            std::cout << "Audio Statistics:" << std::endl;
+            std::cout << "Signal Statistics" << std::endl;
             std::cout << "  Mean Input Signal " << mean << std::endl;
             std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
             std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
             std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
             std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
             std::cout << std::endl;
-            
-            printProcessStatistics(solver);
-            
+
             if (!output_file.empty()) {
-                writeWav(signalOut, output_file, sample_rate);
+                WavHelper wav_helper;
+                wav_helper.write(signalOut, output_file, sample_rate);
             }
-            return true;
-        } else {
-            std::cerr << "Analysis Type not valid: " << analysis_type << std::endl;
-            return false;
         }
-    }
-    
-    void printAnalysisResult(std::unique_ptr<NewtonRaphsonSolver>& solver) {
         solver->printResult();
+        solver->printProcessStatistics();
+        return 0;
     }
     
-    void printDCOperatingPoints(std::unique_ptr<NewtonRaphsonSolver>& solver) {
-        for (int i = 0; i < solver->getNodeVoltages().size(); i++) {
-            std::cout << "   Node " << i << ": " << solver->getNodeVoltages()(i) << " V" << std::endl;
-        }
-        std::cout << std::endl;
-    }
-
-    void printProcessStatistics(std::unique_ptr<NewtonRaphsonSolver>& solver) {
-        std::cout << "Process Statistics:" << std::endl;
-        std::cout << "  Solver's Execution Time: " << solver->getExecutionTime() << " us" << std::endl;
-        std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
-        std::cout << "  Solver's Total Samples: " << solver->getTotalSamples() << std::endl;
-        std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;
-        std::cout << "  Solver's Mean Iterations: " << solver->getMeanIterations() << std::endl;
-        std::cout << std::endl;
-    }
-
-    bool writeWav(std::vector<double> signalOut,
-              const std::string& output_file,
-              int sample_rate,
-              int bitDepth = 24) {
-        
-        // Configura WAV
-        SF_INFO sfInfo;
-        sfInfo.samplerate = sample_rate;
-        sfInfo.channels = 1;
-        
-        switch (bitDepth) {
-            case 16: sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16; break;
-            case 24: sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_PCM_24; break;
-            case 32: sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT; break;
-            default:
-                std::cerr << "Bit depth non supportato" << std::endl;
-                return false;
-        }
-        
-        if (!sf_format_check(&sfInfo)) {
-            std::cerr << "Formato WAV invalido" << std::endl;
-            return false;
-        }
-        
-        // Scrivi WAV
-        SNDFILE* file = sf_open(output_file.c_str(), SFM_WRITE, &sfInfo);
-        if (!file) {
-            std::cerr << "Errore apertura WAV: " << sf_strerror(file) << std::endl;
-            return false;
-        }
-        
-        sf_count_t written = sf_writef_double(file, signalOut.data(), signalOut.size());
-        sf_close(file);
-        
-        if (written != (sf_count_t)signalOut.size()) {
-            std::cerr << "Errore scrittura WAV" << std::endl;
-            return false;
-        }
-        
-        std::cout << "Output File Format" << std::endl;
-        std::cout << "   File Name: " << output_file << std::endl;
-        std::cout << "   Duration: " << (float)signalOut.size() / sample_rate << "s" << std::endl;
-        
-        printFileFormat(output_file);
-        
-        return true;
-    }
-
-    void printFileFormat(const std::string &file) {
-        SF_INFO sfInfo;
-        sfInfo.format = 0;
-        SNDFILE* sound_file = sf_open(file.c_str(), SFM_READ, &sfInfo);
-        sf_close(sound_file);
-        std::cout << "   Channels: " << sfInfo.channels << std::endl;
-        std::cout << "   Sample Rate: " << sfInfo.samplerate << "Hz" << std::endl;
-        std::cout << "   Frames: " << sfInfo.frames << std::endl;
-        std::cout << "   Numeric Format (bitmask): 0x" << std::hex << sfInfo.format << std::dec << std::endl;
-
-        // Decodifica del formato audio (opzionale)
-        int major_format = sfInfo.format & SF_FORMAT_TYPEMASK;
-        int subtype = sfInfo.format & SF_FORMAT_SUBMASK;
-
-        std::cout << "   Container Format: ";
-        switch (major_format) {
-            case SF_FORMAT_WAV:      std::cout << "WAV"; break;
-            case SF_FORMAT_AIFF:     std::cout << "AIFF"; break;
-            case SF_FORMAT_FLAC:     std::cout << "FLAC"; break;
-            default:                 std::cout << "Other (" << std::hex << major_format << std::dec << ")"; break;
-        }
-        std::cout << std::endl;
-
-        std::cout << "   Subtype (PCM, float, etc.): ";
-        switch (subtype) {
-            case SF_FORMAT_PCM_16:   std::cout << "PCM 16-bit"; break;
-            case SF_FORMAT_PCM_24:   std::cout << "PCM 24-bit"; break;
-            case SF_FORMAT_PCM_32:   std::cout << "PCM 32-bit"; break;
-            case SF_FORMAT_FLOAT:    std::cout << "Float"; break;
-            case SF_FORMAT_DOUBLE:   std::cout << "Double"; break;
-            default:                 std::cout << "Other (" << std::hex << subtype << std::dec << ")"; break;
-        }
-        std::cout << std::endl;
-
-        std::cout << std::endl;
-    }
-
 };
 
 int main(int argc, char *argv[]) {

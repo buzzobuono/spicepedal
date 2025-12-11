@@ -35,6 +35,7 @@ public:
             if (n2 != 0) G(n1, n2) -= g;
             I(n1) += voltage * g;
         }
+        
         if (n2 != 0) {
             G(n2, n2) += g;
             if (n1 != 0) G(n2, n1) -= g;

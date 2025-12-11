@@ -37,6 +37,10 @@ class LinearFrequencySweepGenerator : public SignalGenerator {
         return input_amplitude;
     }
 
+    double getSampleRate() const override {
+        return sample_rate;
+    }
+
     void printInfo() const override {
         int f_start = 1;
         int f_end = sample_rate / 2.0;
@@ -44,6 +48,7 @@ class LinearFrequencySweepGenerator : public SignalGenerator {
         std::cout << "   Range: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
         std::cout << "   Amplitude: " << input_amplitude << " V" << std::endl;
         std::cout << "   Duration: " << input_duration << " s" << std::endl;
+        std::cout << std::endl;
     }
     
 };

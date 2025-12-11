@@ -14,7 +14,8 @@ class NewtonRaphsonSolver : public Solver {
     Eigen::VectorXd I;
     Eigen::VectorXd V, V_new;
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
-        
+    
+    double sample_rate;
     double input_voltage;
     double source_g;
     int max_iterations;
@@ -95,6 +96,7 @@ class NewtonRaphsonSolver : public Solver {
     
     NewtonRaphsonSolver(Circuit& circuit, double sample_rate, int source_impedance, int max_iterations, double tolerance) 
         : circuit(circuit), 
+          sample_rate(sample_rate),
           dt(1.0 / sample_rate),
           source_g(1.0 / source_impedance),
           max_iterations(max_iterations),
@@ -125,11 +127,14 @@ class NewtonRaphsonSolver : public Solver {
         input_voltage = vin;
     }
     
-    virtual void printResult() = 0;
-    
-    Eigen::VectorXd getNodeVoltages() {
-        return V;
+    void printDCOperatingPoints() {
+        for (int i = 0; i < V.size(); i++) {
+            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
+        }
+        std::cout << std::endl;
     }
+
+    virtual void printResult() = 0;
     
     bool reset() override {
         V.setZero();

@@ -58,6 +58,16 @@ public:
         return execution_time;
     }
 
+    void printProcessStatistics() {
+        std::cout << "Process Statistics:" << std::endl;
+        std::cout << "  Solver's Execution Time: " << getExecutionTime() << " us" << std::endl;
+        std::cout << "  Solver's Failure Percentage: " << getFailurePercentage() << " %" << std::endl;
+        std::cout << "  Solver's Total Samples: " << getTotalSamples() << std::endl;
+        std::cout << "  Solver's Total Iterations: " << getTotalIterations() << std::endl;
+        std::cout << "  Solver's Mean Iterations: " << getMeanIterations() << std::endl;
+        std::cout << std::endl;
+    }
+    
 };
 
 #endif

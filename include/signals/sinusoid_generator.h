@@ -39,11 +39,20 @@ class SinusoidGenerator : public SignalGenerator {
         return input_amplitude;
     }
 
+    double getSampleRate() const override {
+        return sample_rate;
+    }
+
+    double getFrequency() const {
+        return input_frequency;
+    }
+
     void printInfo() const override {
         std::cout << "Circuit input: Sinusoid" << std::endl;
         std::cout << "   Frequency: " << input_frequency << " Hz" << std::endl;
         std::cout << "   Amplitude: " << input_amplitude << " V" << std::endl;
         std::cout << "   Duration: " << input_duration << " s" << std::endl;
+        std::cout << std::endl;
     }
     
 };
