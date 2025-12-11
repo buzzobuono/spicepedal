@@ -13,6 +13,11 @@
 #include "solvers/zin_solver.h"
 #include "solvers/zout_solver.h"
 #include "solvers/transient_solver.h"
+#include "signals/signal_generator.h"
+#include "signals/dc_generator.h"
+#include "signals/sinusoid_generator.h"
+#include "signals/logarithmic_frequency_sweep_generator.h"
+#include "signals/linear_frequency_sweep_generator.h"
 
 class SpicePedalProcessor
 {
@@ -23,7 +28,8 @@ private:
     int input_frequency;
     double input_duration;
     double input_amplitude;
-    bool frequency_sweep;
+    bool frequency_sweep_log;
+    bool frequency_sweep_lin;
     int source_impedance;
     bool bypass;
     int max_iterations;
@@ -36,7 +42,8 @@ public:
                      int input_frequency,
                      double input_duration,
                      double input_amplitude,
-                     bool frequency_sweep,
+                     bool frequency_sweep_log,
+                     bool frequency_sweep_lin,
                      int source_impedance,
                      bool bypass,
                      int max_iterations,
@@ -47,7 +54,8 @@ public:
           input_frequency(input_frequency),
           input_duration(input_duration),
           input_amplitude(input_amplitude),
-          frequency_sweep(frequency_sweep),
+          frequency_sweep_log(frequency_sweep_log),
+          frequency_sweep_lin(frequency_sweep_lin),
           source_impedance(source_impedance),
           bypass(bypass),
           max_iterations(max_iterations),
@@ -102,6 +110,8 @@ public:
             printProcessStatistics(solver);
             return true;
         } else if (analysis_type == "TRAN") {
+            std::unique_ptr<SignalGenerator> signal_generator;
+            
             std::vector<double> signalIn;
             if (!input_file.empty()) {
                 std::cout << "Circuit input: File" << std::endl;
@@ -150,65 +160,34 @@ public:
                 if (maxNormalized > 1e-10) {
                     scale = input_amplitude / maxNormalized;
                 }
-            } else if (frequency_sweep) {
-                size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
-                signalIn.resize(total_samples, 0.0f);
-                int f_start = 1;
-                int f_end = sample_rate / 2.0;
-                if (true) {
-                    // Log Sweep
-                    double log_f_start = std::log(f_start);
-                    double log_f_end = std::log(f_end);
-                    double k = (log_f_end - log_f_start) / input_duration;
-                    
-                    for (size_t i = 0; i < total_samples; ++i) {
-                        double t = i / sample_rate;
-                        // Fase per sweep logaritmico: integrale di f(t) = f_start * exp(k*t)
-                        double phase = 2.0 * M_PI * f_start * (std::exp(k * t) - 1.0) / k;
-                        signalIn[i] = input_amplitude * std::sin(phase);
-                    }
-                    std::cout << "Logarithmic sweep: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
-                } else {
-                    // Lin Sweep
-                    double k = (f_end - f_start) / input_duration;
-                    for (size_t i = 0; i < total_samples; ++i) {
-                        double t = i / sample_rate;
-                        // Fase per sweep lineare: integrale di f(t) = f_start + k*t
-                        double phase = 2.0 * M_PI * (f_start * t + 0.5 * k * t * t);
-                        signalIn[i] = input_amplitude * std::sin(phase);
-                    }
-                    std::cout << "Linear sweep: " << f_start << " Hz -> " << f_end << " Hz" << std::endl;
-                }
-                
-                // DC offset
-                mean = 0;
-                 // maxNormalized
-                maxNormalized = input_amplitude;
-
+            } else if (frequency_sweep_log) {
+                signal_generator = std::make_unique<LogarithmicFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
+                signal_generator->printInfo();
+                signalIn = signal_generator->generate();
+                mean = signal_generator->getMean();
+                maxNormalized = signal_generator->getMaxNormalized();
+                scale = signal_generator->getScaleFactor();
+            } else if (frequency_sweep_lin) {
+                signal_generator = std::make_unique<LinearFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
+                signal_generator->printInfo();
+                signalIn = signal_generator->generate();
+                mean = signal_generator->getMean();
+                maxNormalized = signal_generator->getMaxNormalized();
+                scale = signal_generator->getScaleFactor();
             } else if (input_frequency > 0) {
-                std::cout << "Circuit input: Sinusoid" << std::endl;
-                size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
-                signalIn.resize(total_samples, 0.0f);
-                for (size_t i = 0; i < total_samples; ++i) {
-                    double t = i / sample_rate;
-                    signalIn[i] = input_amplitude * std::sin(2.0 * M_PI * input_frequency * t);
-                }
-                // DC offset
-                mean = 0;
-                // maxNormalized
-                maxNormalized = input_amplitude;
-
+                signal_generator = std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude);
+                signal_generator->printInfo();
+                signalIn = signal_generator->generate();
+                mean = signal_generator->getMean();
+                maxNormalized = signal_generator->getMaxNormalized();
+                scale = signal_generator->getScaleFactor();
             } else {
-                std::cout << "Circuit input: DC" << std::endl;
-                size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
-                signalIn.resize(total_samples, 0.0f);
-                for (size_t i = 0; i < total_samples; ++i) {
-                    signalIn[i] = input_amplitude;
-                }
-                // Calcola DC offset
-                mean = input_amplitude;
-                 // maxNormalized
-                maxNormalized = input_amplitude;
+                signal_generator = std::make_unique<DCGenerator>(sample_rate, input_duration, input_amplitude);
+                signal_generator->printInfo();
+                signalIn = signal_generator->generate();
+                mean = signal_generator->getMean();
+                maxNormalized = signal_generator->getMaxNormalized();
+                scale = signal_generator->getScaleFactor();
             }
             std::cout << std::endl;
             
@@ -390,7 +369,8 @@ int main(int argc, char *argv[]) {
     int input_frequency = 0;
     double input_duration = 2.0;
     double input_amplitude = 0.15;
-    bool frequency_sweep = false;
+    bool frequency_sweep_log= false;
+    bool frequency_sweep_lin = false;
     int source_impedance = 25000;
     int sample_rate = 44100;
     std::string output_file;
@@ -405,7 +385,8 @@ int main(int argc, char *argv[]) {
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency");
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
     app.add_option("-v,--input-amplitude", input_amplitude, "Input Amplitude")->check(CLI::Range(-5.0, 5.0))->default_val(input_amplitude);
-    app.add_flag("-F,--frequency-sweep", frequency_sweep, "Frequency Sweep")->default_val(frequency_sweep);
+    app.add_flag("-F,--fslog,--frequency-sweep-log", frequency_sweep_log, "Frequency Sweep Logarithmic")->default_val(frequency_sweep_log);
+    app.add_flag("-L,--fslin,--frequency-sweep-lin", frequency_sweep_lin, "Frequency Sweep Linear")->default_val(frequency_sweep_lin);
     app.add_option("-I,--source-impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     
@@ -426,7 +407,8 @@ int main(int argc, char *argv[]) {
     std::cout << "   Input Duration: " << input_duration << "s" << std::endl;
     std::cout << "   Input Amplitude: " << input_amplitude << "V" << std::endl;
     std::cout << "   Source Impedance: " << source_impedance << "Ω" << std::endl;
-    std::cout << "   Frequency Sweep: " << (frequency_sweep ? "True" : "False") << std::endl;
+    std::cout << "   Frequency Sweep Logarithmic: " << (frequency_sweep_log ? "True" : "False") << std::endl;
+    std::cout << "   Frequency Sweep Linear: " << (frequency_sweep_log ? "True" : "False") << std::endl;
     std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
     std::cout << "   Output File: " << output_file << std::endl;
     std::cout << "   Circuit File: " << netlist_file << std::endl;
@@ -436,7 +418,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, input_amplitude, frequency_sweep, source_impedance, bypass, max_iterations, tolerance);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, input_amplitude, frequency_sweep_log, frequency_sweep_lin, source_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }
