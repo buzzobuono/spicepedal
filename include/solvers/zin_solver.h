@@ -19,7 +19,6 @@ class ZInSolver : public NewtonRaphsonSolver {
 
     private:
     
-    double input_frequency;
     
     double Z_magnitude = 0.0;
     double Z_phase = 0.0;
@@ -100,20 +99,10 @@ class ZInSolver : public NewtonRaphsonSolver {
     void printResult() override {
         std::cout << "Input Impedence Analysis" << std::endl;
         std::cout << "   " << std::fixed << std::setprecision(1) << signal_generator->getFrequency() << " Hz: "
-                  << std::setprecision(2) << (Z_magnitude / 1000.0) << " k\u03A9, "
+                  << std::setprecision(2) << (Z_magnitude / 1000.0) << " kΩ, "
                   << std::setprecision(1) << Z_phase << "°" << std::endl;
         std::cout << std::endl;
     }
-        
-    double getZMagnitude() const {
-        return Z_magnitude;
-    }
-    
-    double getZPhaseDegrees() const {
-        return Z_phase;
-    }
-    
 };
 
 #endif
-
