@@ -32,7 +32,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
     public:
     
-    ZOutSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_amplitude, double input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
+    ZOutSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
         : NewtonRaphsonSolver(circuit, sample_rate, source_impedance, max_iterations, tolerance),
           signal_generator(std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude)),
             load_g(1.0 / test_load_impedance),

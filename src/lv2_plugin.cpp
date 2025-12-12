@@ -20,11 +20,10 @@ typedef enum {
 
 typedef struct {
 
-    const double* input;
-    double* output;
-    
-    const double* gain;
-    const double* bypass;
+    const float* input;
+    float* output;
+    const float* gain;
+    const float* bypass;
     
     Circuit* circuit;
     RealTimeSolver* solver;
@@ -46,8 +45,14 @@ static LV2_Handle instantiate(
     const char* bundle_path,
     const LV2_Feature* const* features)
 {
+
+
     CircuitPlugin* plugin = new CircuitPlugin();
-    
+    plugin->input = nullptr;
+    plugin->output = nullptr;
+    plugin->gain = nullptr;
+    plugin->bypass = nullptr;
+
     plugin->sample_rate = sample_rate;
     plugin->initialized = false;
     plugin->total_samples = 0;
@@ -102,16 +107,16 @@ static void connect_port(
     
     switch ((PortIndex)port) {
         case PORT_INPUT:
-            plugin->input = (const double*)data;
+            plugin->input = (const float*)data;
             break;
         case PORT_OUTPUT:
-            plugin->output = (double*)data;
+            plugin->output = (float*)data;
             break;
         case PORT_GAIN:
-            plugin->gain = (const double*)data;
+            plugin->gain = (const float*)data;
             break;
         case PORT_BYPASS:
-            plugin->bypass = (const double*)data;
+            plugin->bypass = (const float*)data;
             break;
     }
 }
@@ -140,11 +145,11 @@ static void run(LV2_Handle instance, uint32_t n_samples)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
     
-    const double* input = plugin->input;
-    double* output = plugin->output;
+    const float* input = plugin->input;
+    float* output = plugin->output;
     
     // Read control parameters
-    double gain = *(plugin->gain);
+    float gain = *(plugin->gain);
     bool bypass = (*(plugin->bypass) > 0.5f);
     
     // Bypass mode - simple passthrough
@@ -158,13 +163,13 @@ static void run(LV2_Handle instance, uint32_t n_samples)
     for (uint32_t i = 0; i < n_samples; ++i) {
         // Input: scale from [-1, 1] to voltage range
         // Assuming your solver expects [-1, 1] volt range
-        double vin = static_cast<double>(input[i]) * gain;
+        float vin = static_cast<float>(input[i]) * gain;
         
         plugin->solver->setInputVoltage(vin);
 
         bool converged = plugin->solver->solve();
         
-        double vout = 0.0f;
+        float vout = 0.0f;
         if (converged) {
             vout = static_cast<float>(plugin->solver->getOutputVoltage());
         } else {

@@ -12,7 +12,6 @@
 #include "solvers/dc_solver.h"
 #include "solvers/zin_solver.h"
 #include "solvers/zout_solver.h"
-#include "solvers/transient_solver_old.h"
 #include "solvers/transient_solver.h"
 #include "signals/signal_generator.h"
 #include "signals/file_input_generator.h"
