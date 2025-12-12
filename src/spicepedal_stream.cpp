@@ -16,7 +16,7 @@
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
-#include "solvers/transient_solver.h"
+#include "solvers/realtime_solver.h"
 
 // =============================================================
 // Funzioni per input non bloccante su Linux
@@ -58,7 +58,7 @@ int getch() {
 class SpicePedalStreamingProcessor {
 private:
     Circuit circuit;
-    std::unique_ptr<TransientSolver> solver;
+    std::unique_ptr<RealTimeSolver> solver;
     double sample_rate;
     double input_gain;
     int source_impedance;
@@ -84,7 +84,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
 
-        solver = std::make_unique<TransientSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
 
         initializeParameters();
     }

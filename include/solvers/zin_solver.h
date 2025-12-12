@@ -19,7 +19,6 @@ class ZInSolver : public NewtonRaphsonSolver {
 
     private:
     
-    
     double Z_magnitude = 0.0;
     double Z_phase = 0.0;
     
