@@ -63,7 +63,13 @@
         "codecvt": "cpp",
         "lu": "cpp",
         "condition_variable": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "list": "cpp",
+        "unordered_set": "cpp",
+        "regex": "cpp",
+        "csignal": "cpp",
+        "bitset": "cpp",
+        "cinttypes": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

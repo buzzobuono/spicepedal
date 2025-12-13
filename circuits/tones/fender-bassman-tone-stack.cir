@@ -1,0 +1,14 @@
+.title Fender Bassman Tone Stack
+
+R1 1 4 56k
+C1 1 2 250e-12
+C2 4 5 0.02e-6
+Ptreble 2 5 3 250k 0.5 LIN
+W 5 6
+Pbass 5 7 6 1M 0.5 LIN
+C3 4 8 0.02e-6
+Pmid 7 0 8 25k 0.5 LIN
+
+.input 1
+.output 3
+.probe fender-bassman-tone-stack.csv V(1) V(3)

@@ -16,7 +16,7 @@
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
-#include "circuit_solver.h"
+#include "solvers/realtime_solver.h"
 
 // =============================================================
 // Funzioni per input non bloccante su Linux
@@ -58,7 +58,7 @@ int getch() {
 class SpicePedalStreamingProcessor {
 private:
     Circuit circuit;
-    std::unique_ptr<CircuitSolver> solver;
+    std::unique_ptr<RealTimeSolver> solver;
     double sample_rate;
     double input_gain;
     int source_impedance;
@@ -84,7 +84,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
 
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
 
         initializeParameters();
     }
@@ -102,39 +102,63 @@ public:
         }
     }
 
-    void handleKeyPress(int c) {
-        if (paramIds.empty()) return;
-        float value;
-        switch (c) {
-            case 'w': case 'W':
-                value =  std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 's': case 'S':
-                value =  std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 'a': case 'A':
-                currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
-            case 'd': case 'D':
-                currentParamIndex = (currentParamIndex + 1) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
+    bool handleKeyPress() {
+        if (paramIds.empty()) return true;
+        if (kbhit()) {
+            int c = getch();
+            if (c == 'q') { // Quit
+                return false;
+            } else {
+                float value;
+                if (c == 27) {
+                    if (!kbhit()) return true;  
+                    int c2 = getch();
+                    if (c2 != '[') return true;
+
+                    if (!kbhit()) return true;
+                    int c3 = getch();
+
+                    switch (c3) {
+                        case 'A':  // ↑
+                            value = std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
+                            paramIds[currentParamIndex].store(value);
+                            circuit.setParamValue(currentParamIndex, value);
+                            break;
+
+                        case 'B':  // ↓
+                            value = std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
+                            paramIds[currentParamIndex].store(value);
+                            circuit.setParamValue(currentParamIndex, value);
+                            break;
+
+                        case 'D':  // ←
+                            currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
+                            std::cout << "Current param index " << currentParamIndex << std::endl;
+                            break;
+
+                        case 'C':  // →
+                            currentParamIndex = (currentParamIndex + 1) % paramIds.size();
+                            std::cout << "Current param index " << currentParamIndex << std::endl;
+                            break;
+                    }
+
+                    return true; 
+                }
+            }
         }
+        return true;
     }
 
     void printControls() {
-        std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-        std::cout << "║          CONTROLLI LIVE                  ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  W/S : Aumenta/Diminuisci parametro      ║" << std::endl;
-        std::cout << "║  A/D : Parametro precedente/successivo   ║" << std::endl;
-        std::cout << "║  ESC : Esci                              ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════╝" << std::endl;
+        std::cout << "╔══════════════════════════════════════════════════╗" << std::endl;
+        std::cout << "║                 Live Controls                    ║" << std::endl;
+        std::cout << "╠══════════════════════════════════════════════════╣" << std::endl;
+        std::cout << "║  ↑ : Decrease Current Parameter                  ║" << std::endl;
+        std::cout << "║  ↓ : Decrease Current Parameter                  ║" << std::endl;
+        std::cout << "║  ← : Previous Parameter                          ║" << std::endl;
+        std::cout << "║  → : Next Parameter                              ║" << std::endl;
+        std::cout << "║  q     : Quit                                    ║" << std::endl;
+        std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
         std::cout << std::endl;
     }
 
@@ -178,24 +202,14 @@ public:
         setNonBlocking(true);
         
         printControls();
-
-        std::cout << "\nControlli: W (aumenta) | S (diminuisce) | ESC (esci)\n";
-        std::cout << "Buffer size: " << buffer_size << " frames\n";
-        std::cout << "Channels: " << sfinfo.channels << "\n\n";
-
+        
         std::thread inputThread([&]() {
             while (running) {
-                if (kbhit()) {
-                    int c = getch();
-                    if (c == 27) { // ESC
-                        running = false;
-                    } else {
-                        handleKeyPress(c);
-                    }
-                }
+                running = handleKeyPress();
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         });
+
 
         sf_count_t readcount;
         while (running) {
@@ -216,7 +230,8 @@ public:
                 for (size_t i = 0; i < numSamples; ++i) {
                     float vin = buffer[i] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     buffer[i] = std::isfinite(vout) ? vout : 0.0f;
@@ -227,7 +242,8 @@ public:
                     size_t idx = frame * 2;
                     float vin = buffer[idx] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     vout = std::isfinite(vout) ? vout : 0.0f;
@@ -240,7 +256,8 @@ public:
                     size_t baseIdx = frame * sfinfo.channels;
                     float vin = buffer[baseIdx] * input_gain;
                     float vout = 0.0f;
-                    if (solver->solve(vin)) {
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
                         vout = solver->getOutputVoltage();
                     }
                     vout = std::isfinite(vout) ? vout : 0.0f;

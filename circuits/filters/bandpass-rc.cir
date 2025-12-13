@@ -1,0 +1,44 @@
+.title Professional Bass Band-Pass 40Hz-5kHz
+
+* HPF @ 40 Hz - elimina rumble e DC
+C_hp1 1 2 47e-6       
+R_hp1 2 3 100         
+
+* Buffer impedenza (opzionale ma migliora matching)
+R_buf 3 4 10k
+
+* LPF @ 5 kHz - primo ordine smooth
+R_lp1 4 5 1.5k      
+C_lp1 5 0 22e-9     
+     
+* LPF @ 8 kHz - secondo ordine per ripidità
+R_lp2 5 6 1.5k     
+C_lp2 6 0 15e-9      
+     
+
+* Output buffer
+R_out 6 7 100
+Rload 7 0 1M
+
+.input 1
+.output 7
+.probe bandpass-rc.csv V(1) V(7)
+
+* RISPOSTA ATTESA:
+* ───────────────────────────────────────
+* Freq    | Gain  | Note
+* ────────┼───────┼─────────────────────
+*   20 Hz | -15dB | Eliminato (subsonic)
+*   40 Hz | -3dB  | Taglio HPF
+*  100 Hz | -0.5  | Piatto ✅
+*  500 Hz | -0.2  | Piatto ✅
+*    1kHz | -0.1  | Piatto ✅
+*    2kHz | -0.3  | Piatto ✅
+*    5kHz | -3dB  | Taglio LPF
+*    8kHz | -9dB  | Attenuazione
+*   10kHz | -15dB | Forte attenuazione
+*   20kHz | -30dB | Quasi eliminato
+*
+* NO PICCHI, risposta smooth ✅
+* Preserva 41Hz-3kHz (tutto il basso) ✅
+* Elimina hiss e rumori >5kHz ✅

@@ -1,0 +1,8 @@
+.title Lowpass filter (100 Hz)
+
+R1 1 2 10k
+C1 2 0 159.15e-9
+
+.input 1
+.output 2
+.probe lowpass-rc.csv V(1) V(2)

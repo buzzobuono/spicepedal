@@ -1,0 +1,8 @@
+.title Highpass filter (100 Hz)
+
+C1 1 2 100e-9
+R1 2 0 15.915k
+
+.input 1
+.output 2
+.probe highpass-rc.csv V(1) V(2)

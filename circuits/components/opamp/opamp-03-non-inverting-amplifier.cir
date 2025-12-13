@@ -1,0 +1,15 @@
+.title Non-Inverting Amplifier (Gain = 1 + R1/R2 = 11)
+
+VCC 10 0 DC 15
+VEE 11 0 DC -15
+
+R1 2 3 10k
+R2 2 0 1k
+
+OP 3 1 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+.input 1
+.output 3
+.probe opamp-03-non-inverting-amplifier.csv V(input) V(1) V(3)
+
+* V(3) = V(1) * ( 1 + R1 / R2 )

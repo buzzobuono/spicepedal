@@ -1,0 +1,8 @@
+.title RL High-Pass Filter 100Hz
+
+R1 1 2 1k
+L1 2 0 1.59
+
+.input 1
+.output 2
+.probe highpass-rl.csv V(1) V(2)

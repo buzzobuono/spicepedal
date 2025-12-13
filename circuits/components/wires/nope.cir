@@ -1,0 +1,7 @@
+.title Wire
+
+W 1 2
+
+.input 1
+.output 2
+.probe nope.csv V(1)V(2)

@@ -1,0 +1,21 @@
+* Test OpAmp - Open Loop (senza feedback)
+
+V1 4 0 DC 15
+V2 5 0 DC -15
+
+* Input differenziale piccolo
+V3 1 0 DC 0.001    * +1mV su in+
+V4 2 0 DC 0.0      * 0V su in-
+
+* OpAmp in open loop
+O1 3 1 2 4 5 TL072 Rout=75 Imax=0.020 Gain=1000 Sr=13
+
+* Solo carico
+R1 3 0 10k
+
+.input 1
+.output 3
+
+.probe test_5.csv V(1) V(2) V(3)
+
+*V(3) ≈ +10V (o saturato a ~13.5V).

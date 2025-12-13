@@ -1,0 +1,8 @@
+.title RL Low-Pass Filter 100Hz
+
+L1 1 2 1.59
+R1 2 0 1k
+
+.input 1
+.output 2
+.probe lowpass-rl.csv V(1) V(2)

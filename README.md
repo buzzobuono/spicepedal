@@ -4,19 +4,25 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 
 ## TODO
 
-[ ] Optimize performamce for real time *solve()* method
-[ ] Implement *getCurrent()* for all component
-[ ] Test Mosfet component in a circuit
-[ ] Test Inductor model in a circuit
-[ ] Adapt project to *c++* best practices
-[ ] Refactor *solveDC()* method
-[ ] Better manage *.probe* implementation
-[ ] implement a circuit generic *lv2* plugin
-[ ] enforce netlist number parsing to avoid collision with measure unit
-[ ] enforve univocity in circuit directive
-[ ] use compile-time param to enable statistics printing 
-[ ] use compile-time param to disable .probe directive (no file production at all)
-[ ] add convergence statistics
+- [ ] Which signalOut when solver fail?
+- [ ] Move log outside from solver
+- [ ] Understand convergence issues in *Wolly Mammoth* circuit
+- [x] Add dumpling in Newton-Raphson and measure sistematically performamce: DOESN'T WORK.
+- [x] Add voltage clipping to help convergence: DOESN'T WORK.
+- [ ] Optimize performamce for real time *solve()* method
+- [ ] Implement *getCurrent()* for all component
+- [ ] Test Mosfet component in a circuit
+- [ ] Test Inductor model in a circuit
+- [ ] Adapt project to *c++* best practices
+- [x] Refactor *solveDC()* method
+- [ ] Better manage *.probe* implementation
+- [ ] implement a circuit generic *lv2* plugin
+- [ ] enforce netlist number parsing to avoid collision with measure unit
+- [ ] enforce univocity in circuit directive
+- [ ] use compile-time param to enable/disable statistics collecting 
+- [ ] use compile-time param to enable/disable .probe directive (no file production at all)
+- [x] add convergence statistics
+- [ ] potentiometer direct stamping avoiding temporary resistor allocation
 
 ## Performance optimizations
 
@@ -27,97 +33,141 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 - Input g: Solver's Execution Time: 6076243 us
 - march=native -DNDEBUG: Solver's Execution Time: 5595021 us
 
-### spicepedal -c circuits/wolly-mammoth.cir -oout.wav -i data/input.wav
-- Original
-**Process Statistics:**                                  
-Solver's Execution Time: 19557967 us                 
-Solver's Failure Percentage: 3.39758 %              
-Solver's Tolal Samples: 3.37867e+06                  
-Solver's Total Iterations: 8.59459e+06               
-Solver's Mean Iterations: 2.54378
+### Temptatives
 
-- Stmp once per sample
-**Process Statistics:**
+spicepedal -i data/input.wav -oout.wav -c circuits/wolly-mammoth.cir
+
+**Pre**
+
+  Solver's Execution Time: 21776558 us                 
+  Solver's Failure Percentage: 25.0988 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 6.50744e+06               
+  Solver's Mean Iterations: 8.88179
+
+Dumpling
+
+  Solver's Execution Time: 64859292 us
+  Solver's Failure Percentage: 87.397 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 1.32889e+07
+  Solver's Mean Iterations: 18.1375
+
+MAX_VOLTAGE_STEP = 2.0
+
+  Solver's Execution Time: 57530962 us               
+  Solver's Failure Percentage: 99.4418 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 1.45878e+07
+  Solver's Mean Iterations: 19.9104
+---
+
+spicepedal -i data/input.wav -oout.wav -c circuits/wolly-mammoth-partial.cir
+ 
+**pre**
+
+  Solver's Execution Time: 7698281 us                  
+  Solver's Failure Percentage: 5.18308 %               
+  Solver's Total Samples: 732672                       
+  Solver's Total Iterations: 4.04263e+06               
+  Solver's Mean Iterations: 5.51765
+
+Dumpling
+
+  never converge
+
+MAX_VOLTAGE_STEP = 2.0
+
+  Solver's Execution Time: 20094462 us
+  Solver's Failure Percentage: 46.5526 %
+  Solver's Total Samples: 732672                      
+  Solver's Total Iterations: 8.68135e+06            
+  Solver's Mean Iterations: 11.8489
+
+---
+
+spicepedal -i data/input.wav -oout.wav -c circuits/bazz_fuss.cir
+ 
+**pre**
+
+  Solver's Execution Time: 4885487 us                  
+  Solver's Failure Percentage: 0.355002 %              
+  Solver's Total Samples: 732672                      
+  Solver's Total Iterations: 4.03762e+06               
+  Solver's Mean Iterations: 5.51081
+
+Dumpling
+
+  Solver's Execution Time: 7824216 us
+  Solver's Failure Percentage: 5.31984 %
+  Solver's Total Samples: 732672                    
+  Solver's Total Iterations: 4.40219e+06
+  Solver's Mean Iterations: 6.0084
+
+MAX_VOLTAGE_STEP = 2.0
+
+  Solver's Execution Time: 7364254 us
+  Solver's Failure Percentage: 0.373837 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 4.03984e+06
+  Solver's Mean Iterations: 5.51385
+
+---
+
+spicepedal -i data/input.wav -oout.wav -c circuits/booster.cir
+
+**pre**
+
+  Solver's Execution Time: 1695727 us
+  Solver's Failure Percentage: 0 %                    
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 1.64668e+06             
+  Solver's Mean Iterations: 2.2475
+
+Dumpling
+
+  Solver's Execution Time: 2375324 us
+  Solver's Failure Percentage: 0 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 1.64668e+06
+  Solver's Mean Iterations: 2.2475
+
+MAX_VOLTAGE_STEP = 2.0
+
+  Solver's Execution Time: 2581791 us
+  Solver's Failure Percentage: 0 %
+  Solver's Total Samples: 732672
+  Solver's Total Iterations: 1.64668e+06
+  Solver's Mean Iterations: 2.2475
 
 
-bool solve(double input_voltage) {
-        static uint64_t sample_count = 0;
-        static uint64_t failed_count = 0;  // conteggio totale dei sample non convergenti
-        double alpha = 0.8;  // Start with higher damping
-        double prev_error = 1e10;
-        
-        double final_error_sq;
-        
-        // Newton-Raphson iteration
-        for (int iter = 0; iter < max_iterations; iter++) {
-            G.setZero();
-            I.setZero();
-            
-            for (auto& component : circuit.components) {
-                component->stamp(G, I, V, dt);
-            }
-            
-            if (circuit.input_node > 0) {
-                G(circuit.input_node, circuit.input_node) += source_g;
-                I(circuit.input_node) += input_voltage * source_g;
-            }
-            
-            // Ground node constraint
-            G.row(0).setZero();
-            G.col(0).setZero();
-            G(0, 0) = 1.0;
-            I(0) = 0.0;
-            
-            // Shunt resistor per stabilità
-            G.diagonal().array() += 1e-12;
-            
-            // DEBUG solo per un sample specifico
-            if (sample_count == 10 && iter == 0) {
-                std::cout << "Matrice G:\n" << G << "\n\n";
-                std::cout << "Vettore I:\n" << I << "\n\n";
-                std::cout << "Determinante: " << G.determinant() << std::endl;
-            }
-            
-            // Solve linear system
-            lu_solver.compute(G);
-            V_new = lu_solver.solve(I);
-            
-            double error_sq = (V_new - V).squaredNorm();
-            final_error_sq = error_sq;
-            if (error_sq < tolerance_sq) {
-                V = V_new;
-                
-                for (auto& comp : circuit.components) {
-                    comp->updateHistory(V, dt);
-                }
-                
-                logProbes(sample_count * dt);
-                sample_count++;
-                return true;  // convergente
-            }
-            
-            // Damping adattativo
-            if (iter > 0 && error_sq > prev_error) {
-                alpha *= 0.5;
-                alpha = std::max(alpha, 0.1);
-            } else if (iter > 2 && error_sq < prev_error * 0.5) {
-                alpha = std::min(alpha * 1.2, 1.0);
-            }
-            
-            V = alpha * V_new + (1.0 - alpha) * V;
-        }
-        
-        // Se arriviamo qui => non convergente
-        failed_count++;
-        sample_count++;
-        logProbes((sample_count-1) * dt);  // log comunque
-        
-        return false;
-    }
+#Opamp
+
+                    // Parametri di default basati sul modello
+    double r_out = 75.0;
+    double i_max = 0.025;
+    double gain = 100000.0;
+    double sr = 13.0e6;
     
-    // Funzione ausiliaria per ottenere la percentuale di fallimenti
-    double getFailurePercentage() {
-        extern uint64_t sample_count;   // o static dentro solve, gestire visibilità
-        extern uint64_t failed_count;
-        return (sample_count > 0) ? (100.0 * failed_count / sample_count) : 0.0;
+    // Modelli predefiniti comuni
+    if (model == "TL072" || model == "TL082") {
+        r_out = 75.0;
+        i_max = 0.020;
+        sr = 13.0e6;
+    } else if (model == "JRC4558" || model == "RC4558") {
+        r_out = 100.0;
+        i_max = 0.015;
+        sr = 1.0e6;
+    } else if (model == "LM358" || model == "LM324") {
+        r_out = 100.0;
+        i_max = 0.020;
+        sr = 0.5e6;
+    } else if (model == "OPA2134") {
+        r_out = 50.0;
+        i_max = 0.040;
+        sr = 20.0e6;
+    } else if (model == "GENERIC") {
+        // Usa defaults, leggi parametri custom
     }
+
+

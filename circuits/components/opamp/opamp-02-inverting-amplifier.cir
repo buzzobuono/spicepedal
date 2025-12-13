@@ -1,0 +1,16 @@
+.title Inverting Amplifier (Gain = -10)
+
+VCC 10 0 DC 15
+VEE 11 0 DC -15
+
+R1 1 2 10k
+R2 2 3 100k
+
+OP 3 0 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+* SIN(0 0.5 440)
+.input 1
+.output 3
+.probe opamp-02-inverting-amplifier.csv V(input) V(1) V(3)
+
+* V(3) = - V(1) * ( R2 / R1 )

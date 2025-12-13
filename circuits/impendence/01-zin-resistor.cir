@@ -1,0 +1,7 @@
+* Resitor
+* Zin = 47k + source_impendence
+
+R 1 0 47k
+
+.input 1
+.output 1

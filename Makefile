@@ -1,16 +1,17 @@
 CXX = g++
 ifeq ($(origin TERMUX__PREFIX), environment)
-    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG
+    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only
     INCLUDES = -I$(TERMUX__PREFIX)/include/eigen3 -Iinclude
 else
-    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG #-Wall -Wextra -fsanitize=address 
+    CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only #-Wall -Wextra -fsanitize=address 
     INCLUDES = -I/usr/include/eigen3 -Iinclude
 endif
 LIBS_SNDFILE = -lsndfile
 LIBS_PORTAUDIO = -lportaudio
+LIBS_FFTW3 = -lfftw3
 
 # LV2 Plugin configuration
-PLUGIN_NAME = circuit_simulator
+PLUGIN_NAME = spicepedal
 PLUGIN_SO = $(PLUGIN_NAME).so
 LV2_BUNDLE = $(PLUGIN_NAME).lv2
 USER_LV2_DIR = $(HOME)/.lv2
@@ -21,13 +22,16 @@ BIN_INSTALL_DIR = $(HOME)/bin
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: spicepedal spicepedal-stream
+all: spicepedal spicepedal-stream spicepedal-plot 
 
 spicepedal: clean_spicepedal create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG}
 
 spicepedal-stream: clean_spicepedal-stream create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
+
+spicepedal-plot: clean_spicepedal-plot create_bin_folder
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG} ${LIBS_FFTW3}
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
@@ -37,9 +41,9 @@ install-lv2: lv2
 	@mkdir -p $(INSTALL_DIR)/circuits
 	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
 	@cp ttl/manifest.ttl $(INSTALL_DIR)/
-	@cp ttl/circuit_simulator.ttl $(INSTALL_DIR)/
-	@cp circuits/*.cir $(INSTALL_DIR)/circuits/
-	@echo "Test with: jalv.gtk http://github.com/buzzobuono/circuit_simulator"
+	@cp ttl/spicepedal.ttl $(INSTALL_DIR)/
+	@cp -r circuits/ $(INSTALL_DIR)/
+	@echo "Test with: jalv.gtk http://github.com/buzzobuono/spicepedal"
 
 uninstall-lv2:
 	rm -rf $(INSTALL_DIR)
@@ -55,7 +59,7 @@ test-lv2: install-lv2
 		exit 1; \
 	fi
 	@if command -v lv2ls >/dev/null 2>&1; then \
-		if lv2ls | grep -q "circuit_simulator"; then \
+		if lv2ls | grep -q "spicepedal"; then \
 			echo "✓ Plugin recognized by LV2"; \
 		else \
 			echo "⚠ Plugin not found in lv2ls"; \
@@ -69,8 +73,10 @@ install: all
 	@mkdir -p $(BIN_INSTALL_DIR)
 	@cp bin/spicepedal $(BIN_INSTALL_DIR)/
 	@cp bin/spicepedal-stream $(BIN_INSTALL_DIR)/
+	@cp bin/spicepedal-plot $(BIN_INSTALL_DIR)/
 	@chmod +x $(BIN_INSTALL_DIR)/spicepedal
 	@chmod +x $(BIN_INSTALL_DIR)/spicepedal-stream
+	@chmod +x $(BIN_INSTALL_DIR)/spicepedal-plot
 	@echo "✓ Binaries installed to ~/bin"
 	@echo "✓ Make sure ~/bin is in your PATH"
 
@@ -78,6 +84,7 @@ install: all
 uninstall:
 	@rm -f $(BIN_INSTALL_DIR)/spicepedal
 	@rm -f $(BIN_INSTALL_DIR)/spicepedal-stream
+	@rm -f $(BIN_INSTALL_DIR)/spicepedal-plot
 	@echo "✓ Binaries removed from ~/bin"
 
 clean_spicepedal:
@@ -85,6 +92,9 @@ clean_spicepedal:
 
 clean_spicepedal-stream:
 	@rm -f bin/spicepedal-stream
+
+clean_spicepedal-plot:
+	@rm -f bin/spicepedal-plot
 
 clean_lv2:
 	@rm -f lib/$(PLUGIN_SO)
