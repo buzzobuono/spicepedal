@@ -71,4 +71,16 @@
         lv2:maximum 1.0 ;
         lv2:portProperty lv2:toggled ;
         lv2:designation lv2:enabled
+    ] , , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 4 ;
+        lv2:symbol "circuit" ;
+        lv2:name "Circuit" ;
+        lv2:shortName "Circuit" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 5.0 ;
+        lv2:portProperty lv2:toggled ;
+        lv2:designation lv2:enabled
     ] .

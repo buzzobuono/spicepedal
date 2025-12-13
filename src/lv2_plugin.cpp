@@ -1,21 +1,21 @@
-// lv2_plugin.cpp - SpicePedal LV2 Plugin
 #include <lv2/core/lv2.h>
 #include <cmath>
 #include <cstring>
 #include <iostream>
 #include <atomic>
+#include <lv2/worker/worker.h> 
 
 #include "circuit.h"
 #include "solvers/realtime_solver.h"
 
 #define PLUGIN_URI "http://github.com/buzzobuono/spicepedal"
 
-// Port indices
 typedef enum {
     PORT_INPUT = 0,
     PORT_OUTPUT = 1,
     PORT_GAIN = 2,
-    PORT_BYPASS = 3
+    PORT_BYPASS = 3,
+    PORT_CIRCUIT_SELECT = 4
 } PortIndex;
 
 typedef struct {
@@ -24,6 +24,7 @@ typedef struct {
     float* output;
     const float* gain;
     const float* bypass;
+    const float* circuit_select;
     
     Circuit* circuit;
     RealTimeSolver* solver;
@@ -37,7 +38,39 @@ typedef struct {
     uint64_t total_samples;
     uint32_t non_convergence_count;
     
+    std::atomic<int> current_circuit_id;
+    std::atomic<int> requested_circuit_id;
+
+    const LV2_Worker_Interface* worker;
+    LV2_Worker_Schedule* schedule;
+    std::string bundle_path;
+
 } CircuitPlugin;
+
+static const char* circuit_id_to_path(int id) {
+    switch (id) {
+        case 0: return "/circuits/fuzzes/bazz-fuss.cir";
+        case 1: return "/circuits/booster/booster.cir";
+        case 2: return "/circuits/fuzzes/wolly-mammoth.cir";
+        case 3: return "/circuits/filters/lowpass-rc.cir";
+        case 4: return "/circuits/filters/highpass-rc.cir";
+        default: return nullptr;
+    }
+}
+
+static LV2_Worker_Status worker_work(
+    LV2_Handle instance,
+    LV2_Worker_Respond_Function respond,
+    LV2_Worker_Respond_Handle handle,
+    uint32_t size,
+    const void* data);
+
+static LV2_Worker_Status worker_end(
+    LV2_Handle instance,
+    uint32_t size,
+    const void* data);
+
+static LV2_Worker_Status worker_destroy(LV2_Handle instance);
 
 static LV2_Handle instantiate(
     const LV2_Descriptor* descriptor,
@@ -52,16 +85,23 @@ static LV2_Handle instantiate(
     plugin->output = nullptr;
     plugin->gain = nullptr;
     plugin->bypass = nullptr;
+    plugin->circuit_select = nullptr;
+    
+    plugin->worker = nullptr;
+    plugin->schedule = nullptr;
+    plugin->bundle_path = std::string(bundle_path);
 
     plugin->sample_rate = sample_rate;
     plugin->initialized = false;
     plugin->total_samples = 0;
-    plugin->non_convergence_count = 0;
-    plugin->last_gain.store(1.0f);
-    plugin->last_bypass.store(false);
+    plugin->current_circuit_id.store(-1);
+    plugin->requested_circuit_id.store(-1);
     
+    int initial_id = 0;
+    const char* initial_path_suffix = circuit_id_to_path(initial_id);
+
     plugin->circuit = new Circuit();
-    std::string netlist_path = std::string(bundle_path) + "/circuits/fuzzes/bazz-fuss.cir";
+    std::string netlist_path = plugin->bundle_path + initial_path_suffix;
     
     if (!plugin->circuit->loadNetlist(netlist_path)) {
         std::cerr << "SpicePedal ERROR: Failed to load netlist: " << std::endl;
@@ -75,13 +115,16 @@ static LV2_Handle instantiate(
         plugin->solver = new RealTimeSolver(
             *plugin->circuit,
             sample_rate,
-            25000,      // input impedance (25kΩ typical for guitar)
-            15,         // max_iterations (reduced for real-time)
-            1e-6       // tolerance (relaxed for speed)
+            25000,
+            15,
+            1e-6
         );
         
         plugin->solver->initialize();
 
+        plugin->current_circuit_id.store(initial_id);
+        plugin->requested_circuit_id.store(initial_id);
+        
         std::cerr << "SpicePedal Loaded Successfully @ " 
                   << sample_rate << " Hz" << std::endl;
         
@@ -92,12 +135,19 @@ static LV2_Handle instantiate(
         plugin->solver = nullptr;
     }
     
+    for (int i = 0; features[i]; ++i) {
+        if (!strcmp(features[i]->URI, LV2_WORKER__schedule)) {
+            plugin->schedule = (LV2_Worker_Schedule*)features[i]->data;
+        }
+    }
+    
+    if (!plugin->schedule) {
+        std::cerr << "SpicePedal WARNING: LV2 Worker extension not supported by host. Runtime circuit change disabled." << std::endl;
+    }
+    
     return (LV2_Handle)plugin;
 }
 
-// ============================================
-// Connect Port - Host tells us where buffers are
-// ============================================
 static void connect_port(
     LV2_Handle instance,
     uint32_t port,
@@ -118,25 +168,23 @@ static void connect_port(
         case PORT_BYPASS:
             plugin->bypass = (const float*)data;
             break;
+        case PORT_CIRCUIT_SELECT:
+            plugin->circuit_select = (const float*)data;
+            break;
     }
 }
 
-// ============================================
-// Activate - Called when host starts processing
-// ============================================
 static void activate(LV2_Handle instance)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
     
     if (plugin->solver && !plugin->initialized) {
-        // Initialize circuit (warmup)
         try {
             plugin->solver->initialize();
             plugin->initialized = true;
             std::cerr << "[SpicePedal LV2] Circuit initialized" << std::endl;
         } catch (const std::exception& e) {
-            std::cerr << "[SpicePedal LV2] Initialization error: " 
-                      << e.what() << std::endl;
+            std::cerr << "[SpicePedal LV2] Initialization error: " << e.what() << std::endl;
         }
     }
 }
@@ -147,22 +195,36 @@ static void run(LV2_Handle instance, uint32_t n_samples)
     
     const float* input = plugin->input;
     float* output = plugin->output;
+
+    if (plugin->circuit_select && plugin->schedule) {
+        int new_id = (int)std::round(*(plugin->circuit_select)); 
+        
+        if (new_id != plugin->current_circuit_id.load() && 
+            new_id != plugin->requested_circuit_id.load()) 
+        {
+            const char* path = circuit_id_to_path(new_id);
+            if (path) {
+                plugin->requested_circuit_id.store(new_id);
+                plugin->schedule->schedule_work(plugin->schedule->handle, sizeof(int), &new_id);
+            } else {
+                std::cerr << "[SpicePedal LV2] Invalid circuit ID requested: " << new_id << std::endl;
+            }
+        }
+    }
     
-    // Read control parameters
     float gain = *(plugin->gain);
     bool bypass = (*(plugin->bypass) > 0.5f);
     
-    // Bypass mode - simple passthrough
     if (bypass || !plugin->solver) {
-        // Just copy input to output
-        std::memcpy(output, input, n_samples * sizeof(double));
+        if (!plugin->solver) {
+            std::memset(output, 0, n_samples * sizeof(float));
+            return; 
+        }
+        std::memcpy(output, input, n_samples * sizeof(float));
         return;
     }
     
-    // Process audio through SpicePedal
     for (uint32_t i = 0; i < n_samples; ++i) {
-        // Input: scale from [-1, 1] to voltage range
-        // Assuming your solver expects [-1, 1] volt range
         float vin = static_cast<float>(input[i]) * gain;
         
         plugin->solver->setInputVoltage(vin);
@@ -173,57 +235,26 @@ static void run(LV2_Handle instance, uint32_t n_samples)
         if (converged) {
             vout = static_cast<float>(plugin->solver->getOutputVoltage());
         } else {
-            // Non-convergence: use last good value or zero
             plugin->non_convergence_count++;
             vout = (i > 0) ? output[i-1] : 0.0f;
         }
         
-        // Safety: clip output to prevent DAC damage
         if (std::isnan(vout) || std::isinf(vout)) {
             vout = 0.0f;
         }
         
-        // Soft clip to [-1, 1] range
         if (vout > 1.0f) vout = 1.0f;
         if (vout < -1.0f) vout = -1.0f;
         
         output[i] = vout;
-        plugin->total_samples++;
-    }
-    
-    // Debug: print stats every 10 seconds
-    static uint64_t last_report = 0;
-    if (plugin->total_samples - last_report > plugin->sample_rate * 10) {
-        if (plugin->non_convergence_count > 0) {
-            std::cerr << "[SpicePedal LV2] Non-convergences: " 
-                      << plugin->non_convergence_count 
-                      << " / " << plugin->total_samples 
-                      << " (" << (100.0 * plugin->non_convergence_count / plugin->total_samples) 
-                      << "%)" << std::endl;
-        }
-        last_report = plugin->total_samples;
     }
 }
 
-// ============================================
-// Deactivate - Called when host stops processing
-// ============================================
 static void deactivate(LV2_Handle instance)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
-    
-    std::cerr << "[SpicePedal LV2] Deactivated. Total samples: " 
-              << plugin->total_samples << std::endl;
-    
-    if (plugin->non_convergence_count > 0) {
-        std::cerr << "[SpicePedal LV2] Total non-convergences: " 
-                  << plugin->non_convergence_count << std::endl;
-    }
 }
 
-// ============================================
-// Cleanup - Free all resources
-// ============================================
 static void cleanup(LV2_Handle instance)
 {
     CircuitPlugin* plugin = (CircuitPlugin*)instance;
@@ -238,17 +269,119 @@ static void cleanup(LV2_Handle instance)
     delete plugin;
 }
 
-// ============================================
-// Extension Data - For advanced features
-// ============================================
-static const void* extension_data(const char* uri)
+static LV2_Worker_Status worker_work(
+    LV2_Handle instance,
+    LV2_Worker_Respond_Function respond,
+    LV2_Worker_Respond_Handle handle,
+    uint32_t size,
+    const void* data)
 {
-    return nullptr;  // No extensions for now
+    CircuitPlugin* plugin = (CircuitPlugin*)instance;
+    const int new_circuit_id = *(const int*)data;
+    const char* path_suffix = circuit_id_to_path(new_circuit_id);
+
+    if (!path_suffix) {
+        int failed_id = -1;
+        respond(handle, sizeof(int), &failed_id);
+        return LV2_WORKER_SUCCESS;
+    }
+
+    if (plugin->solver) delete plugin->solver;
+    if (plugin->circuit) delete plugin->circuit;
+    plugin->solver = nullptr;
+    plugin->circuit = nullptr;
+    plugin->initialized = false;
+    
+    std::string full_path = plugin->bundle_path + path_suffix;
+    
+    plugin->circuit = new Circuit();
+    
+    if (plugin->circuit->loadNetlist(full_path)) {
+        try {
+            plugin->solver = new RealTimeSolver(
+                *plugin->circuit,
+                plugin->sample_rate,
+                25000, 15, 1e-6
+            );
+            
+            respond(handle, sizeof(int), &new_circuit_id);
+            return LV2_WORKER_SUCCESS;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "SpicePedal Worker ERROR: " << e.what() << std::endl;
+        }
+    } else {
+        std::cerr << "SpicePedal Worker ERROR: Failed to load netlist: " << full_path << std::endl;
+    }
+    
+    if (plugin->solver) delete plugin->solver;
+    if (plugin->circuit) delete plugin->circuit;
+    plugin->solver = nullptr;
+    plugin->circuit = nullptr;
+    
+    int failed_id = -1;
+    respond(handle, sizeof(int), &failed_id);
+    
+    return LV2_WORKER_SUCCESS;
 }
 
-// ============================================
-// Descriptor - Plugin metadata
-// ============================================
+static LV2_Worker_Status worker_end(
+    LV2_Handle instance,
+    uint32_t size,
+    const void* data)
+{
+    CircuitPlugin* plugin = (CircuitPlugin*)instance;
+    const int finished_circuit_id = *(const int*)data;
+
+    if (finished_circuit_id >= 0 && plugin->solver) {
+        
+        try {
+            plugin->solver->initialize();
+            plugin->initialized = true;
+            
+            plugin->current_circuit_id.store(finished_circuit_id);
+            plugin->requested_circuit_id.store(finished_circuit_id);
+
+            std::cerr << "[SpicePedal LV2] Circuit change successful: ID " 
+                      << finished_circuit_id << std::endl;
+                      
+        } catch (const std::exception& e) {
+            std::cerr << "[SpicePedal LV2] Final initialization error after worker: " 
+                      << e.what() << std::endl;
+            delete plugin->solver;
+            delete plugin->circuit;
+            plugin->solver = nullptr;
+            plugin->circuit = nullptr;
+            plugin->current_circuit_id.store(-1);
+            plugin->requested_circuit_id.store(-1);
+        }
+    } else {
+         plugin->requested_circuit_id.store(plugin->current_circuit_id.load()); 
+         std::cerr << "[SpicePedal LV2] Circuit change failed in Worker." << std::endl;
+    }
+
+    return LV2_WORKER_SUCCESS;
+}
+
+static LV2_Worker_Status worker_destroy(LV2_Handle instance)
+{
+    return LV2_WORKER_SUCCESS;
+}
+
+static const LV2_Worker_Interface worker_iface = {
+    worker_work,
+    worker_end,
+    worker_destroy
+};
+
+static const void* extension_data(const char* uri)
+{
+    if (!strcmp(uri, LV2_WORKER__interface)) {
+        return &worker_iface;
+    }
+    return nullptr;
+}
+
 static const LV2_Descriptor descriptor = {
     PLUGIN_URI,
     instantiate,
@@ -260,9 +393,6 @@ static const LV2_Descriptor descriptor = {
     extension_data
 };
 
-// ============================================
-// Entry point - LV2 discovery
-// ============================================
 LV2_SYMBOL_EXPORT
 const LV2_Descriptor* lv2_descriptor(uint32_t index)
 {
