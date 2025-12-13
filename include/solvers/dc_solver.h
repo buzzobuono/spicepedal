@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <memory>
 #include <map>
-#include <Eigen/Dense>
 
 class DCSolver : public NewtonRaphsonSolver {
     

@@ -7,7 +7,6 @@
 #include <memory>
 #include <map>
 #include <complex>
-#include <Eigen/Dense>
 #include <cmath>
 
 #include "circuit.h"

@@ -1,6 +1,14 @@
 #ifndef ZOUT_SOLVER_H
 #define ZOUT_SOLVER_H
 
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <memory>
+#include <map>
+#include <complex>
+#include <cmath>
+
 #include "circuit.h"
 #include "solvers/newton_raphson_solver.h"
 #include "signals/signal_generator.h"

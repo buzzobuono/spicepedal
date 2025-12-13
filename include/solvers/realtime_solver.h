@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <memory>
 #include <map>
-#include <Eigen/Dense>
 
 class RealTimeSolver : public NewtonRaphsonSolver {    
 

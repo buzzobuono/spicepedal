@@ -6,7 +6,6 @@
 #include <iomanip>
 #include <memory>
 #include <map>
-#include <Eigen/Dense>
 
 #include "solvers/newton_raphson_solver.h"
 #include "circuit.h"
@@ -189,14 +188,13 @@ class TransientSolver : public NewtonRaphsonSolver {
     }
     
     void printResult() override {
-         
-            std::cout << "Signal Statistics" << std::endl;
-            std::cout << "  Mean Input Signal " << mean << std::endl;
-            std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
-            std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
-            std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
-            std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
-            std::cout << std::endl;
+        std::cout << "Signal Statistics" << std::endl;
+        std::cout << "  Mean Input Signal " << mean << std::endl;
+        std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
+        std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
+        std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
+        std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
+        std::cout << std::endl;
     }
     
 };
