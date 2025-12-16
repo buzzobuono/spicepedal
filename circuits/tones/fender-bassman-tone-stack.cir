@@ -11,4 +11,7 @@ Pmid 7 0 8 25k 0.5 LIN
 
 .input 1
 .output 3
+.param 0 Pbass
+.param 1 Pmid
+.param 2 Ptreble
 .probe fender-bassman-tone-stack.csv V(1) V(3)

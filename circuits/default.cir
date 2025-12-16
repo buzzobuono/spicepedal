@@ -1,0 +1,7 @@
+.title Default empty circuit
+
+W 1 2
+
+.input 1
+.output 2
+

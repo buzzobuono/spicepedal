@@ -9,18 +9,18 @@ endif
 LIBS_SNDFILE = -lsndfile
 LIBS_PORTAUDIO = -lportaudio
 LIBS_FFTW3 = -lfftw3
-
-# LV2 Plugin configuration
-PLUGIN_NAME = spicepedal
-PLUGIN_SO = $(PLUGIN_NAME).so
-LV2_BUNDLE = $(PLUGIN_NAME).lv2
-USER_LV2_DIR = $(HOME)/.lv2
-INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
-BIN_INSTALL_DIR = $(HOME)/bin
-
-# LV2 compilation flags
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
+
+CIRCUIT = default
+CIRCUIT_FILE = circuits/default.cir
+PLUGIN_URI = http://github.com/buzzobuono/spicepedal\#default
+LV2_BUNDLE = spicepedal.$(CIRCUIT).lv2
+INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
+
+PLUGIN_SO = spicepedal.so
+USER_LV2_DIR = $(HOME)/.lv2
+BIN_INSTALL_DIR = $(HOME)/bin
 
 all: spicepedal spicepedal-stream spicepedal-plot 
 
@@ -33,42 +33,6 @@ spicepedal-stream: clean_spicepedal-stream create_bin_folder
 spicepedal-plot: clean_spicepedal-plot create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG} ${LIBS_FFTW3}
 
-lv2: clean_lv2
-	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
-
-install-lv2: lv2
-	@mkdir -p $(INSTALL_DIR)
-	@mkdir -p $(INSTALL_DIR)/circuits
-	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
-	@cp ttl/manifest.ttl $(INSTALL_DIR)/
-	@cp ttl/spicepedal.ttl $(INSTALL_DIR)/
-	@cp -r circuits/ $(INSTALL_DIR)/
-	@echo "Test with: jalv.gtk http://github.com/buzzobuono/spicepedal"
-
-uninstall-lv2:
-	rm -rf $(INSTALL_DIR)
-
-# Test LV2 installation
-test-lv2: install-lv2
-	@echo ""
-	@echo "Testing LV2 installation..."
-	@if [ -d "$(INSTALL_DIR)" ]; then \
-		echo "✓ Plugin directory exists"; \
-	else \
-		echo "✗ Plugin directory not found"; \
-		exit 1; \
-	fi
-	@if command -v lv2ls >/dev/null 2>&1; then \
-		if lv2ls | grep -q "spicepedal"; then \
-			echo "✓ Plugin recognized by LV2"; \
-		else \
-			echo "⚠ Plugin not found in lv2ls"; \
-		fi; \
-	else \
-		echo "⚠ lv2ls not available (install lilv-utils)"; \
-	fi
-	@echo "✓ Test complete"
-
 install: all
 	@mkdir -p $(BIN_INSTALL_DIR)
 	@cp bin/spicepedal $(BIN_INSTALL_DIR)/
@@ -80,7 +44,6 @@ install: all
 	@echo "✓ Binaries installed to ~/bin"
 	@echo "✓ Make sure ~/bin is in your PATH"
 
-# Uninstall binaries from ~/bin
 uninstall:
 	@rm -f $(BIN_INSTALL_DIR)/spicepedal
 	@rm -f $(BIN_INSTALL_DIR)/spicepedal-stream
@@ -96,8 +59,56 @@ clean_spicepedal-stream:
 clean_spicepedal-plot:
 	@rm -f bin/spicepedal-plot
 
-clean_lv2:
-	@rm -f lib/$(PLUGIN_SO)
-
 create_bin_folder:
 	@mkdir -p bin/ lib/
+
+lv2-bazz-fuss:
+	@$(MAKE) install-lv2 \
+		CIRCUIT="bazz-fuss" \
+		CIRCUIT_FILE="circuits/fuzzes/bazz-fuss.cir" \
+		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#bazz-fuss"
+
+lv2-lowpass-rc:
+	@$(MAKE) install-lv2 \
+		CIRCUIT="lowpass-rc" \
+		CIRCUIT_FILE="circuits/filters/lowpass-rc.cir" \
+		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#lowpass-rc"
+
+lv2-highpass-rc:
+	@$(MAKE) install-lv2 \
+		CIRCUIT="highpass-rc" \
+		CIRCUIT_FILE="circuits/filters/highpass-rc.cir" \
+		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#highpass-rc"
+
+lv2-wolly-mammoth:
+	@$(MAKE) install-lv2 \
+		CIRCUIT="wolly-mammoth" \
+		CIRCUIT_FILE="circuits/fuzzes/wolly-mammoth-partial.cir" \
+		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#wolly-mammoth"
+
+lv2-tone-stack:
+	@$(MAKE) install-lv2 \
+		CIRCUIT="tone-stack" \
+		CIRCUIT_FILE="circuits/tones/fender-bassman-tone-stack.cir" \
+		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#tone-stack"
+
+lv2: clean-lv2
+	@echo "Compilazione LV2 (Circuit: $(CIRCUIT))"
+	@echo 
+	@mkdir -p lib
+	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES)		src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG} -DPLUGIN_URI='"$(PLUGIN_URI)"'
+
+install-lv2: lv2
+	@mkdir -p $(INSTALL_DIR)
+	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/manifest.ttl > $(INSTALL_DIR)/manifest.ttl
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal.ttl > $(INSTALL_DIR)/spicepedal.ttl
+	@cp -r $(CIRCUIT_FILE) $(INSTALL_DIR)/circuit.cir
+	@echo "✓ Plugin LV2 (Circuit: $(CIRCUIT)) installato in $(INSTALL_DIR)"
+	@echo "Test with: jalv $(PLUGIN_URI)"
+
+clean-lv2:
+	@rm -f lib/$(PLUGIN_SO)
+
+uninstall-lv2:
+	rm -rf $(INSTALL_DIR)

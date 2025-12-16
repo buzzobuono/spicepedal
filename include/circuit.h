@@ -374,9 +374,7 @@ public:
         auto it = param_map.find(id);
         if (it == param_map.end())
             throw std::runtime_error("Parameter ID not found: " + std::to_string(id));
-        
         it->second->setPosition(value);
-        std::cout << "   Parameter " << id << " (" << it->second->name << ") set to " << value << std::endl;
     }
 
     double getParamValue(int id) {

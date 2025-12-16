@@ -5,22 +5,23 @@
 @prefix pg:    <http://lv2plug.in/ns/ext/port-groups#> .
 @prefix foaf:  <http://xmlns.com/foaf/0.1/> .
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix opts:  <http://lv2plug.in/ns/ext/options#> .
+@prefix atom:  <http://lv2plug.in/ns/ext/atom#> .
+@prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
 
-<http://github.com/buzzobuono/spicepedal>
+<@PLUGIN_URI@>
     a lv2:Plugin ,
-        lv2:SimulatorPlugin ,
-        lv2:DistortionPlugin ;
+        lv2:SimulatorPlugin ;
     
-    doap:name "SpicePedal" ;
+    doap:name "SpicePedal (@CIRCUIT@)" ;
     doap:description "A realtime simple spice-like simulator for audio" ;
     doap:license <https://opensource.org/licenses/MIT> ;
     doap:maintainer [
-        foaf:name "Your Name" ;
+        foaf:name "Buzzobuono" ;
         foaf:homepage <https://github.com/buzzobuono>
     ] ;
     
     lv2:optionalFeature lv2:hardRTCapable ;
-    lv2:requiredFeature <http://lv2plug.in/ns/ext/options#options> ;
     
     lv2:port [
         a lv2:AudioPort ,
@@ -71,16 +72,44 @@
         lv2:maximum 1.0 ;
         lv2:portProperty lv2:toggled ;
         lv2:designation lv2:enabled
-    ] , , [
+    ] , [
         a lv2:InputPort ,
             lv2:ControlPort ;
         lv2:index 4 ;
-        lv2:symbol "circuit" ;
-        lv2:name "Circuit" ;
-        lv2:shortName "Circuit" ;
-        lv2:default 0.0 ;
+        lv2:symbol "param0" ;
+        lv2:name "Param0" ;
+        lv2:shortName "Param0" ;
+        lv2:default 0.5 ;
         lv2:minimum 0.0 ;
-        lv2:maximum 5.0 ;
-        lv2:portProperty lv2:toggled ;
-        lv2:designation lv2:enabled
+        lv2:maximum 1.0
+    ] , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 5 ;
+        lv2:symbol "param1" ;
+        lv2:name "Param1" ;
+        lv2:shortName "Param1" ;
+        lv2:default 0.5 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0
+    ] , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 6 ;
+        lv2:symbol "param2" ;
+        lv2:name "Param2" ;
+        lv2:shortName "Param2" ;
+        lv2:default 0.5 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0
+    ] , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 7 ;
+        lv2:symbol "param3" ;
+        lv2:name "Param3" ;
+        lv2:shortName "Param3" ;
+        lv2:default 0.5 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0
     ] .
