@@ -1,0 +1,24 @@
+* Alimentazione
+VCC 10 0 DC 9
+VEE 11 0 DC -9
+
+* NODI: 
+* 2 = Uscita dell'Op-Amp
+* 3 = Ingresso NON-Invertente (plus)
+* 1 = Ingresso Invertente (minus)
+
+* RETROAZIONE POSITIVA (Trigger di Schmitt)
+R1 2 3 10k
+R2 3 0 10k
+
+* RETROAZIONE NEGATIVA (Temporizzazione RC)
+R3 2 1 47k
+C1 1 0 22e-9
+
+* ISTANZA OP-AMP (Secondo il tuo costruttore: out, plus, minus, vcc, vee)
+O1 2 3 1 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+.output 2
+.ic C1 0.1
+.warmup 0.5
+.probe oscillator.csv V(1) V(2)

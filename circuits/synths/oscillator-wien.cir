@@ -1,0 +1,42 @@
+.title Three Wien Bridge Oscillators - C Major Chord
+
+VCC 10 0 DC 9
+VEE 11 0 DC -9
+
+R1a 3 1 10k
+R2a 1 2 10k
+C1a 3 2 0.061u
+C2a 2 0 0.061u
+R3a 0 14 10k
+R4a 14 3 10k
+O1a 14 2 3 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R1b 6 4 10k
+R2b 4 5 10k
+C1b 6 5 0.048u
+C2b 5 0 0.048u
+R3b 0 15 10k
+R4b 15 6 10k
+O1b 15 5 6 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R1c 9 7 10k
+R2c 7 8 10k
+C1c 9 8 0.041u
+C2c 8 0 0.041u
+R3c 0 16 10k
+R4c 16 9 10k
+O1c 16 8 9 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R_mix1 3 12 33k
+R_mix2 6 12 33k
+R_mix3 9 12 33k
+
+R_out 12 13 1k
+
+.ic C1a 0.1
+.ic C1b 0.1
+.ic C1c 0.1
+
+.output 13
+.probe oscillator-wien.csv V(3) V(6) V(9)
+

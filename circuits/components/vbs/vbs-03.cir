@@ -1,0 +1,13 @@
+B_ENV 2 0 V=min(5.0, Vprev + (abs(V1 * 700) - Vprev) * (dt / 0.0005)) Rs=1
+
+B_OMEGA 3 0 V=2 * 3.1415 * (250 + V2 * 550) Rs=1
+
+B_VEL 4 0 V= Vprev + (V1*3.2 - tanh(V5/0.9) - Vprev) * V3 * dt Rs=1
+
+B_POS 5 0 V=Vprev + (V4 * V3 * dt * 1.1) Rs=1
+
+B_OUT 6 0 V=0.85*V1 + 2*V4
+
+.input 1
+.output 6
+.probe vbs.csv V(1) V(4)

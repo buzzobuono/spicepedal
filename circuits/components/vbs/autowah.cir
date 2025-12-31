@@ -1,0 +1,30 @@
+* --- PARTE 1: GENERAZIONE DEL CONTROL VOLTAGE (CV) ---
+* Legge l'audio (V1), genera una tensione di controllo al nodo 2.
+* Range previsto: 0V (silenzio) a circa 5V (picco massimo).
+*B_ENV 2 0 V=min(5.0, Vprev + (abs(V1 * 80) - Vprev) * (dt / 0.005)) Rs=1
+B_ENV 2 0 V=min(5.0, Vprev + (abs(V1 * 300) - Vprev) * (dt / 0.005)) Rs=1
+
+* --- PARTE 2: TRADUZIONE CV -> FREQUENZA (Omega) ---
+* Trasformiamo il voltaggio in radianti al secondo.
+* V(2) * 1000 trasforma i Volt in Hz (es. 2V = 2000Hz).
+* Moltiplichiamo per 2*pi per avere Omega.
+B_OMEGA 3 0 V=2 * 3.1415 * (200 + V2 * 600) Rs=1
+
+* --- PARTE 3: IL FILTRO VCF (Voltage Controlled Filter) ---
+* Nodo 4: Velocità (Uscita Passa-Banda / Il WAH vero e proprio)
+* Nodo 5: Posizione (Feedback interno)
+* Usiamo V(3) come "motore" di frequenza.
+
+* Equazione Velocità (Smorzamento Q=4 per sentire bene l'effetto)
+B_VEL 4 0 V=Vprev + (V1*3 - tanh(V5/0.8) - Vprev) * V3 * dt Rs=1
+
+* Equazione Posizione
+B_POS 5 0 V=Vprev + (V4 * V3 * dt) Rs=1
+
+* --- OUTPUT FINALE ---
+* Sommiamo un po' di segnale originale per non perdere le basse frequenze
+B_OUT 6 0 V=tanh(0.7*V1 + 6*V4)
+
+.input 1
+.output 6
+.probe vbs.csv V(1) V(4)

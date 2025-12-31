@@ -24,6 +24,8 @@
 #include "components/inductor.h"
 #include "components/potentiometer.h"
 #include "components/wire.h"
+#include "components/vcvs.h"
+#include "components/voltage_behavioral_source.h"
 
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -245,6 +247,95 @@ public:
                     << std::endl;
                     
                     max_node = std::max({max_node, n_out, n_plus, n_minus, n_vcc, n_vee});
+                    break;
+                }
+                case 'E': {
+                    int n_out_p;
+                    int n_out_m;
+                    int n_ctrl_p;
+                    int n_ctrl_m;  
+                    double gain;
+                    double v_max;
+                    double v_min;
+                    double r_out;
+                    iss >> n_out_p >> n_out_m >> n_ctrl_p >> n_ctrl_m;
+                    std::string token;
+                    while (iss >> token) {
+                        if (token.find("Rout=") == 0) {
+                            r_out = std::stod(token.substr(5));
+                        } else if (token.find("Vmax=") == 0) {
+                            v_max = std::stod(token.substr(5));
+                        } else if (token.find("Vmin=") == 0) {
+                            v_min = std::stod(token.substr(5));
+                        } else if (token.find("Gain=") == 0) {
+                            gain = std::stod(token.substr(5));
+                        }
+                    }
+                    
+                    components.push_back(std::make_unique<VCVS>(
+                       comp_name, n_out_p, n_out_m, n_ctrl_p, n_ctrl_m,
+                       gain, v_max, v_min, r_out
+                    ));
+    
+                    std::cout << "   Component VCVS name=" << comp_name
+                    << " n_out_p=" << n_out_p
+                    << " n_out_m=" << n_out_m
+                    << " n_ctrl_p=" << n_ctrl_p
+                    << " n_ctrl_m=" << n_ctrl_m
+                    << " Gain=" << gain
+                    << " Vmax=" << v_max
+                    << " Vmin=" << v_min
+                    << " Rout=" << r_out
+                    << std::endl;
+                    
+                    max_node = std::max({max_node, n_out_p, n_out_m, n_ctrl_p, n_ctrl_m});
+                    break;
+                }
+                case 'B': {
+                    int n1, n2;
+                    std::string expr_part;
+                    double rs = 1e-3; // Default robusto
+                    
+                    // Leggiamo i nodi di uscita
+                    iss >> n1 >> n2;
+                    
+                    // Leggiamo il resto della riga per estrarre l'espressione e Rs
+                    std::string remainder;
+                    std::getline(iss, remainder);
+                    
+                    // Cerchiamo se l'utente ha specificato Rs=... alla fine della riga
+                    size_t rs_pos = remainder.find("Rs=");
+                    std::string expression;
+                    
+                    if (rs_pos != std::string::npos) {
+                        expression = remainder.substr(0, rs_pos);
+                        std::string rs_val = remainder.substr(rs_pos + 3);
+                        // Rimuoviamo eventuali spazi bianchi
+                        rs_val.erase(std::remove_if(rs_val.begin(), rs_val.end(), ::isspace), rs_val.end());
+                        if (!rs_val.empty()) rs = std::stod(rs_val);
+                    } else {
+                        expression = remainder;
+                    }
+                    
+                    // Pulizia dell'espressione (rimuove il prefisso "V=" se presente stile LTspice)
+                    size_t v_eq_pos = expression.find("V=");
+                    if (v_eq_pos != std::string::npos) {
+                        expression = expression.substr(v_eq_pos + 2);
+                    }
+                    
+                    // Rimuoviamo spazi iniziali/finali rimasti
+                    expression.erase(0, expression.find_first_not_of(" \t"));
+                    expression.erase(expression.find_last_not_of(" \t") + 1);
+
+                    auto b_source = std::make_unique<VoltageBehavioralSource>(comp_name, n1, n2, expression, rs);
+                    
+                    std::cout << "   Component VoltageBehavioralSource name=" << comp_name 
+                              << " n1=" << n1 << " n2=" << n2 
+                              << " expr=\"" << expression << "\"" 
+                              << " Rs=" << rs << std::endl;
+                              
+                    components.push_back(std::move(b_source));
+                    max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case '.': {

@@ -1,0 +1,17 @@
+.title Simple Oscillator
+
+VCC 10 0 DC 9
+VEE 11 0 DC -9
+
+R1 3 1 10k
+R2 1 0 10k
+C1 2 1 0.5u
+R3 3 2 10k
+
+O1 1 2 3 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+R_out 3 4 1k
+
+.ic C1 0.1
+.output 4
+.probe oscillator.csv V(4)

@@ -14,7 +14,9 @@ enum class ComponentType {
     VOLTAGE_SOURCE,
     POTENTIOMETER,
     WIRE,
-    OPAMP
+    OPAMP,
+    VCVS,
+    VOLTAGE_BEHAVIORAL_SOURCE
 };
 
 class Component {

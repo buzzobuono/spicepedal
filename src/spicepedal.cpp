@@ -19,6 +19,7 @@
 #include "signals/logarithmic_frequency_sweep_generator.h"
 #include "signals/linear_frequency_sweep_generator.h"
 #include "signals/dc_generator.h"
+#include "signals/pulse_generator.h"
 #include "utils/wav_helper.h"
 
 class SpicePedalProcessor
@@ -33,6 +34,7 @@ private:
     double input_amplitude;
     bool frequency_sweep_log;
     bool frequency_sweep_lin;
+    bool input_pulse;
     int source_impedance;
     bool bypass;
     int max_iterations;
@@ -50,6 +52,7 @@ public:
                      double input_amplitude,
                      bool frequency_sweep_log,
                      bool frequency_sweep_lin,
+                     bool input_pulse,
                      int source_impedance,
                      bool bypass,
                      int max_iterations,
@@ -64,6 +67,7 @@ public:
           input_amplitude(input_amplitude),
           frequency_sweep_log(frequency_sweep_log),
           frequency_sweep_lin(frequency_sweep_lin),
+          input_pulse(input_pulse),
           source_impedance(source_impedance),
           bypass(bypass),
           max_iterations(max_iterations),
@@ -115,6 +119,8 @@ public:
             signal_generator = std::make_unique<LogarithmicFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
         } else if (frequency_sweep_lin) {
             signal_generator = std::make_unique<LinearFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
+        } else if (input_pulse){
+            signal_generator = std::make_unique<PulseGenerator>(sample_rate, input_duration, 0, input_amplitude, input_duration/3, 0, 0, input_duration/10, 1.0/input_frequency);
         } else if (input_frequency > 0) {
             signal_generator = std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude);
         } else {
@@ -135,6 +141,7 @@ int main(int argc, char *argv[]) {
     double input_amplitude = 0.15;
     bool frequency_sweep_log= false;
     bool frequency_sweep_lin = false;
+    bool input_pulse = false;
     int source_impedance = 25000;
     int sample_rate = 44100;
     std::string output_file;
@@ -151,6 +158,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-v,--input-amplitude", input_amplitude, "Input Amplitude")->check(CLI::Range(-5.0, 5.0))->default_val(input_amplitude);
     app.add_flag("-F,--fslog,--frequency-sweep-log", frequency_sweep_log, "Frequency Sweep Logarithmic")->default_val(frequency_sweep_log);
     app.add_flag("-L,--fslin,--frequency-sweep-lin", frequency_sweep_lin, "Frequency Sweep Linear")->default_val(frequency_sweep_lin);
+    app.add_flag("-p,--input-pulse", input_pulse, "Input Pulse")->default_val(input_pulse);
     app.add_option("-I,--source-impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     
@@ -173,6 +181,7 @@ int main(int argc, char *argv[]) {
     std::cout << "   Source Impedance: " << source_impedance << "Ω" << std::endl;
     std::cout << "   Frequency Sweep Logarithmic: " << (frequency_sweep_log ? "True" : "False") << std::endl;
     std::cout << "   Frequency Sweep Linear: " << (frequency_sweep_log ? "True" : "False") << std::endl;
+    std::cout << "   Input Pulse: " << (input_pulse ? "True" : "False") << std::endl;
     std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
     std::cout << "   Output File: " << output_file << std::endl;
     std::cout << "   Circuit File: " << netlist_file << std::endl;
@@ -182,7 +191,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_file, input_frequency, input_duration, input_amplitude, frequency_sweep_log, frequency_sweep_lin, source_impedance, bypass, max_iterations, tolerance, output_file);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_file, input_frequency, input_duration, input_amplitude, frequency_sweep_log, frequency_sweep_lin, input_pulse, source_impedance, bypass, max_iterations, tolerance, output_file);
         if (!processor.process()) {
             return 1;
         }

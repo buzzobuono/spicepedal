@@ -1,0 +1,9 @@
+.title VCVS Minimal Test
+
+E1 2 0 1 0 Gain=2 Vmax=15 Vmin=-15 Rout=0.01
+
+Rload 2 0 10k
+
+.input 1
+.output 2
+.probe vcvs.csv V(1) V(2)

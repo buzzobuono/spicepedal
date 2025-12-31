@@ -1,0 +1,6 @@
+* Genera un'onda a dente di sega basata sul tempo e sul valore precedente
+* Se l'uscita supera 1V, resetta a 0, altrimenti sale con pendenza 100V/s
+B_SAW 1 0 V=if(Vprev > 1, 0, Vprev + 100*dt) Rs=1e-3
+
+.output 1
+.probe vbs.csv V(1)

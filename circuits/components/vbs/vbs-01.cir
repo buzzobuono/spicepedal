@@ -1,0 +1,9 @@
+.title Test Distorsione Soft-Clip
+
+* Applica una saturazione morbida
+B_DRIVE 2 0 V=tanh(V1*100) Rs=1e-3
+*B_DRIVE 2 0 V=abs(V1) Rs=1e-3
+
+.input 1
+.output 2
+.probe vbs.csv V(1) V(2)

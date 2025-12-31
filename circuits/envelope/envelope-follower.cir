@@ -20,7 +20,7 @@ R_mod2 5 4 100k      ; envelope
 C_mod1 5 6 0.002u    ; condensatore più piccolo per convergenza
 O2 6 5 6 10 11 TL072 Rout=75 Imax=0.020 Gain=1 Sr=13
 
-.probe envelope_follower.csv V(1) V(4) V(6)
+.probe envelope_follower.csv V(1) V(4)
 .output 6
 .input 1
 .warmup 5

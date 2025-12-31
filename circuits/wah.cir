@@ -1,0 +1,13 @@
+.title Circuito Wah RC Attivo con Potenziometro P
+
+R1 1 2 2.2k
+C2 3 0 1.2e-9
+C1 2 4 100e-9
+P1 2 3 4 1k 0.1 LIN 
+W 3 4
+E_op 5 0 3 0 Gain=2 Vmax=15 Vmin=-15 Rout=100
+
+.input 1
+.output 5
+
+.probe wah.csv V(1) V(5)

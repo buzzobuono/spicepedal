@@ -1,0 +1,18 @@
+.title Sallen-Key Low Pass VCF
+
+
+* Prima sezione RC
+R1 1 2 10k
+C1 2 4 10e-9
+
+* Seconda sezione RC
+R2 2 3 10k
+C2 3 0 10e-9
+
+* VCVS configurato come Buffer (Guadagno = 1)
+* Il segnale al nodo 3 (uscita del filtro) viene riportato al nodo 4
+E1 4 0 3 0 Gain=3 Vmax=15 Vmin=-15 Rout=1
+
+.input 1
+.output 4
+.probe vcf_simple.csv V(1) V(4)

@@ -1,0 +1,17 @@
+* Feedback Positivo (Soglie a +/- 4.25V se Vmax=8.5)
+R1 2 3 10k
+R2 3 0 10k
+
+* Feedback Negativo (Target 440 Hz)
+R3 2 1 10.3k
+C1 1 0 100e-9
+
+* COMPONENTE E (VCVS)
+* Sintassi: E1 Out+ Out- In+ In- Guadagno Vmin Vmax
+E1 2 0 3 1 Gain=1000 Vmax=8.5 Vmin=-8.5 Rout=1
+
+
+.output 2
+.ic C1 0.1
+.warmup 0.5
+.probe oscillator.csv V(2)
