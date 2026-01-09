@@ -1,0 +1,15 @@
+.title Octaver Down
+
+B_OCT 2 0 V= if(abs(Vprev) < 0.1, 1, if((V1 > 0) and (V1prev <= 0), -Vprev, Vprev)) Rs=1
+
+*B_TONE 3 0 V= V1 * V2 Rs=1
+
+B_LOWPASS 3 0 V= (0.05 * V2) + (0.95 * Vprev) Rs=1
+B_ENV 4 0 V= max(abs(V1), Vprev * 0.999) Rs=1
+
+*B_ENV 3 0 V= max(abs(V1), Vprev * 0.95) Rs=1
+*B_RESULT 4 0 V= V2 * V3
+
+.input 1
+.output 4
+.probe octaver-down.csv V(1) V(4)

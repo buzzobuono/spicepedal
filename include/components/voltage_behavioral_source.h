@@ -20,6 +20,7 @@ private:
 
     mutable std::vector<double> v_buffer;
     mutable double v_prev = 0.0;
+    mutable std::vector<double> v_nodes_prev;
     mutable double dt_internal = 0.0;
     mutable double time_internal = 0.0;
     
@@ -42,16 +43,26 @@ public:
         
         if (!is_initialized) {
             v_buffer.resize(V.size(), 0.0);
+            v_nodes_prev.resize(V.size(), 0.0);
             
             for (int i = 0; i < V.size(); ++i) {
                 symbol_table.add_variable("V" + std::to_string(i), v_buffer[i]);
+                symbol_table.add_variable("V" + std::to_string(i) + "prev", v_nodes_prev[i]);
             }
             symbol_table.add_variable("dt", dt_internal);
             symbol_table.add_variable("t", time_internal);
             symbol_table.add_variable("Vprev", v_prev);
+            if (params) {
+                for (auto const& [name, value] : params->getAll()) {
+                    std::cout << "Add variable " << name << std::endl;
+                    symbol_table.add_variable(name, *params->getPtr(name));
+                }
+            }
             
             expression.register_symbol_table(symbol_table);
+            
             if (!parser.compile(expression_string, expression)) {
+                std::cout << "[EXPRTK ERROR] " << parser.error() << " in expression: " << expression_string << std::endl;
                 throw std::runtime_error("VoltageBehavioralSource: expression syntax error");
             }
             is_initialized = true;
@@ -83,6 +94,9 @@ public:
     void updateHistory(const Eigen::VectorXd& V, double dt) override {
         time_internal += dt; 
         v_prev = v_target;
+        for(int i=0; i < V.size(); ++i) {
+            v_nodes_prev[i] = V(i);
+        }
     }
 };
 

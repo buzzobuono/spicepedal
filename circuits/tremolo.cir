@@ -1,0 +1,11 @@
+* Tremolo
+
+B_LFO 0 0 V=modulation:=(depth * sin(2 * 3.14 * speed * t))
+B_GAIN 2 0 V=V1 * (1 + modulation)
+
+.param speed 8
+.param depth 0.8
+.param modulation 0
+.input 1
+.output 2
+.probe tremolo.csv V(1) V(2)

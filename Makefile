@@ -25,10 +25,10 @@ BIN_INSTALL_DIR = $(HOME)/bin
 all: spicepedal spicepedal-stream spicepedal-plot 
 
 spicepedal: clean_spicepedal create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG} ${LIBS_FFTW3}
 
 spicepedal-stream: clean_spicepedal-stream create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${LIBS_FFTW3} ${DEBUG}
 
 spicepedal-plot: clean_spicepedal-plot create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG} ${LIBS_FFTW3}
@@ -51,7 +51,7 @@ uninstall:
 	@echo "✓ Binaries removed from ~/bin"
 
 clean_spicepedal:
-	@rm -f bin/pedal_spice
+	@rm -f bin/spicepedal
 
 clean_spicepedal-stream:
 	@rm -f bin/spicepedal-stream

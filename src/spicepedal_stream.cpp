@@ -159,7 +159,7 @@ public:
         std::cout << "║  ↓ : Decrease Current Parameter                  ║" << std::endl;
         std::cout << "║  ← : Previous Parameter                          ║" << std::endl;
         std::cout << "║  → : Next Parameter                              ║" << std::endl;
-        std::cout << "║  q     : Quit                                    ║" << std::endl;
+        std::cout << "║  q : Quit                                        ║" << std::endl;
         std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
         std::cout << std::endl;
     }

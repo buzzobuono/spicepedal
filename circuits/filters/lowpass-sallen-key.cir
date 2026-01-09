@@ -1,0 +1,16 @@
+.title Sallen-Key Low-Pass Filter
+
+VCC 10 0 DC 15
+VEE 11 0 DC -15
+
+R1 1 2 100k
+R2 2 3 100k
+C1 2 4 1e-9  
+C2 3 0 1e-9
+
+* Op-amp: Out In+ In- VCC VEE
+OP 4 3 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+
+.input 1
+.output 4
+.probe lowpass-sallen-key.csv V(input) V(4)

@@ -16,21 +16,37 @@ enum class ComponentType {
     WIRE,
     OPAMP,
     VCVS,
-    VOLTAGE_BEHAVIORAL_SOURCE
+    VOLTAGE_BEHAVIORAL_SOURCE,
+    SUBCIRCUIT
 };
 
 class Component {
-public:
+    
+    protected:
+    
+    ParameterRegistry* params = nullptr;
+
+    public:
+    
     ComponentType type;
     std::string name;
     std::vector<int> nodes;
     
     virtual ~Component() = default;
+    
+    void setParams(ParameterRegistry* pr) {
+        params = pr;
+    }
+    
     virtual void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
                       const Eigen::VectorXd& V, double dt) = 0;
+    
     virtual void updateHistory(const Eigen::VectorXd& V, double dt) {}
+    
     virtual void reset() {}
+    
     virtual double getCurrent() const { return 0.0; }
+    
 };
 
 #endif

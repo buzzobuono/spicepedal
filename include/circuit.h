@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <locale>
 
+#include "utils/param_registry.h"
 #include "components/component.h"
 #include "components/voltage.h"
 #include "components/resistor.h"
@@ -26,6 +27,9 @@
 #include "components/wire.h"
 #include "components/vcvs.h"
 #include "components/voltage_behavioral_source.h"
+#include "components/subckt/pitch_tracker.h"
+#include "components/subckt/fft_pitch_tracker.h"
+#include "components/subckt/integrator.h"
 
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -39,6 +43,7 @@ struct ProbeTarget {
 class Circuit {
     
 public:
+    ParameterRegistry params;
     std::vector<std::unique_ptr<Component>> components;
     int num_nodes;
     int input_node;
@@ -333,9 +338,46 @@ public:
                               << " n1=" << n1 << " n2=" << n2 
                               << " expr=\"" << expression << "\"" 
                               << " Rs=" << rs << std::endl;
-                              
+                    
+                    b_source->setParams(&(this->params));
                     components.push_back(std::move(b_source));
                     max_node = std::max(max_node, std::max(n1, n2));
+                    break;
+                }
+                case 'X': {
+                    int n1, n2;
+                    std::string subckt;
+                    iss >> n1 >> n2 >> subckt;
+                    if (subckt == "PITCH") {
+                        double thr = 0.02;
+                        double smooth = 0.2;
+                        std::string token;
+                        while (iss >> token) {
+                            if (token.find("thr=") == 0) {
+                                thr = std::stod(token.substr(4));
+                            } else if (token.find("smooth=") == 0) {
+                                smooth = std::stod(token.substr(7));
+                            }
+                        }
+                        std::cout << "   SubCircuit PITCH name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " thr=" << thr << " smooth=" << smooth << std::endl;
+                        components.push_back(std::make_unique<PitchTracker>(comp_name, n1, n2, thr, smooth));
+                        max_node = std::max(max_node, std::max(n1, n2));
+                    } else if (subckt == "FFTPITCH") {
+                        int size = 8192;
+                        std::string token;
+                        while (iss >> token) {
+                            if (token.find("size=") == 0) {
+                                size = std::stod(token.substr(5));
+                            }
+                        }
+                        std::cout << "   SubCircuit FFTPITCH name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " size=" << size << std::endl;
+                        components.push_back(std::make_unique<FFTPitchTracker>(comp_name, n1, n2, size));
+                        max_node = std::max(max_node, std::max(n1, n2));
+                    } else if (subckt == "INTEGRATOR") {
+                        std::cout << "   SubCircuit INTEGRATOR name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
+                        components.push_back(std::make_unique<Integrator>(comp_name, n1, n2));
+                        max_node = std::max(max_node, std::max(n1, n2));
+                    }
                     break;
                 }
                 case '.': {
@@ -373,12 +415,18 @@ public:
                         iss >> cap_name >> v0;
                         initial_conditions[cap_name] = v0;
                         std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
-                    } else if (directive == ".param") {
+                    } else if (directive == ".pot") {
                         int id;
                         std::string comp_name;
                         iss >> id >> comp_name;
                         pending_params.push_back({id, comp_name});
-                        std::cout << "   Directive Param: id=" << id << " comp=" << comp_name << std::endl;
+                        std::cout << "   Directive Pot: id=" << id << " comp=" << comp_name << std::endl;
+                    } else if (directive == ".param") {
+                        std::string p_name;
+                        double p_val;
+                        iss >> p_name >> p_val;
+                        std::cout << "   Directive Param: name=" << p_name << " val=" << p_val << std::endl;
+                        params.set(p_name, p_val);
                     }
                     break;
                 }
@@ -399,7 +447,7 @@ public:
                 if (comp->name == comp_name) {
                     auto* pot = dynamic_cast<Potentiometer*>(comp.get());
                     if (!pot)
-                        throw std::runtime_error(".param refers to non-potentiometer: " + comp_name);
+                        throw std::runtime_error(".pot refers to non-potentiometer: " + comp_name);
                     param_map[id] = pot;
                     found = true;
                     std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
@@ -407,7 +455,7 @@ public:
                 }
             }
             if (!found)
-                throw std::runtime_error(".param component not found: " + comp_name);
+                throw std::runtime_error(".pot component not found: " + comp_name);
         }
         std::cout << std::endl;
         

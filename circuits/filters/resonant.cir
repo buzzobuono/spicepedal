@@ -1,0 +1,13 @@
+.title Sallen-Key Resontant Filter
+
+R1 1 2 2.2k
+R2 2 3 2.2k
+C1 2 4 100e-9  
+C2 3 0 1.2e-9
+   
+E_op 4 0 3 0 Gain=1.415 Vmax=15 Vmin=-15 Rout=11000
+
+* Comandi del simulatore
+.input 1
+.output 4
+.probe resonant.csv V(input) V(4)
