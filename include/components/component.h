@@ -16,7 +16,7 @@ enum class ComponentType {
     WIRE,
     OPAMP,
     VCVS,
-    VOLTAGE_BEHAVIORAL_SOURCE,
+    BEHAVIORAL_VOLTAGE_SOURCE,
     SUBCIRCUIT
 };
 

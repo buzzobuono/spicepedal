@@ -15,7 +15,7 @@
 
 #include "utils/param_registry.h"
 #include "components/component.h"
-#include "components/voltage.h"
+#include "components/voltage_source.h"
 #include "components/resistor.h"
 #include "components/capacitor.h"
 #include "components/diode.h"
@@ -26,7 +26,7 @@
 #include "components/potentiometer.h"
 #include "components/wire.h"
 #include "components/vcvs.h"
-#include "components/voltage_behavioral_source.h"
+#include "components/behavioral_voltage_source.h"
 #include "components/subckt/pitch_tracker.h"
 #include "components/subckt/fft_pitch_tracker.h"
 #include "components/subckt/integrator.h"
@@ -299,12 +299,8 @@ public:
                 case 'B': {
                     int n1, n2;
                     std::string expr_part;
-                    double rs = 1e-3; // Default robusto
-                    
-                    // Leggiamo i nodi di uscita
-                    iss >> n1 >> n2;
-                    
-                    // Leggiamo il resto della riga per estrarre l'espressione e Rs
+                    double rs = 1e-3;
+                    iss >> n1 >> n2;                    
                     std::string remainder;
                     std::getline(iss, remainder);
                     
@@ -332,9 +328,9 @@ public:
                     expression.erase(0, expression.find_first_not_of(" \t"));
                     expression.erase(expression.find_last_not_of(" \t") + 1);
 
-                    auto b_source = std::make_unique<VoltageBehavioralSource>(comp_name, n1, n2, expression, rs);
+                    auto b_source = std::make_unique<BehavioralVoltageSource>(comp_name, n1, n2, expression, rs);
                     
-                    std::cout << "   Component VoltageBehavioralSource name=" << comp_name 
+                    std::cout << "   Component BehavioralVoltageSource name=" << comp_name 
                               << " n1=" << n1 << " n2=" << n2 
                               << " expr=\"" << expression << "\"" 
                               << " Rs=" << rs << std::endl;

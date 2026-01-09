@@ -18,6 +18,7 @@ public:
     {
         name = comp_name;
         nodes = {n_in, n_out};
+        type = ComponentType::SUBCIRCUIT;
     }
 
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I,

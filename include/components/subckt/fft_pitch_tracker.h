@@ -22,6 +22,7 @@ public:
         : n_in(in), n_out(out), buffer_size(size) {
         this->name = name;
         nodes = {n_in, n_out};
+        type = ComponentType::SUBCIRCUIT;
         buffer.resize(buffer_size, 0.0);
         
         fft_in = (double*) fftw_malloc(sizeof(double) * buffer_size);
@@ -87,57 +88,6 @@ public:
         // 3. Conversione in frequenza
         if (max_pos > 0) {
             current_freq = sample_rate / max_pos;
-        }
-    }
-    
-    void analyzeFrequency__() {
-        // 1. Windowing (Hann) per ridurre il leakage spettrale
-        for (int i = 0; i < buffer_size; i++) {
-            double window = 0.5 * (1.0 - cos(2.0 * M_PI * i / (buffer_size - 1)));
-            fft_in[i] = buffer[i] * window;
-        }
-
-        fftw_execute(plan);
-
-        // 2. Calcolo Magnitudo (Spettro Reale)
-        int num_bins = buffer_size / 2 + 1;
-        std::vector<double> magnitude(num_bins);
-        for (int i = 0; i < num_bins; i++) {
-            magnitude[i] = sqrt(fft_out[i][0] * fft_out[i][0] + fft_out[i][1] * fft_out[i][1]);
-        }
-
-        // 3. HPS (Harmonic Product Spectrum) - Per beccare la fondamentale
-        // Moltiplichiamo lo spettro per le sue versioni downsamplate
-        std::vector<double> hps = magnitude;
-        int num_harmonics = 3; // Controlliamo fino alla 3° armonica
-        for (int j = 2; j <= num_harmonics; j++) {
-            for (int i = 0; i < num_bins / j; i++) {
-                hps[i] *= magnitude[i * j];
-            }
-        }
-
-        // 4. Ricerca del picco nel range utile (30Hz - 1000Hz)
-        double max_val = 0;
-        int max_bin = 0;
-        int min_bin = (30.0 * buffer_size) / sample_rate;
-        int max_search_bin = (1000.0 * buffer_size) / sample_rate;
-
-        for (int i = std::max(1, min_bin); i < std::min(num_bins, max_search_bin); i++) {
-            if (hps[i] > max_val) {
-                max_val = hps[i];
-                max_bin = i;
-            }
-        }
-
-        // 5. Interpolazione Parabolica per precisione millimetrica (Vnodo stabile)
-        if (max_bin > 1 && max_bin < num_bins - 1 && magnitude[max_bin] > 0.001) {
-            double y1 = magnitude[max_bin - 1];
-            double y2 = magnitude[max_bin];
-            double y3 = magnitude[max_bin + 1];
-            
-            // Calcola lo spostamento frazionario del bin
-            double delta = 0.5 * (y1 - y3) / (y1 - 2 * y2 + y3);
-            current_freq = (max_bin + delta) * sample_rate / buffer_size;
         }
     }
 

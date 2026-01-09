@@ -21,7 +21,6 @@ public:
         return it != values.end() ? it->second : 0.0;
     }
     
-    // Metodo per iterare sulla mappa interna
     const std::map<std::string, double>& getAll() const { 
         return values; 
     }
