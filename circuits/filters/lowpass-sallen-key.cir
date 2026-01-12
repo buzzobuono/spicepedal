@@ -5,8 +5,8 @@ VEE 11 0 DC -15
 
 R1 1 2 100k
 R2 2 3 100k
-C1 2 4 1e-9  
-C2 3 0 1e-9
+C1 2 4 1n
+C2 3 0 1n
 
 * Op-amp: Out In+ In- VCC VEE
 OP 4 3 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13

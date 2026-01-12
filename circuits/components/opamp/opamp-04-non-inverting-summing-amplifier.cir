@@ -13,9 +13,10 @@ R2 3 2 10k
 R3 4 0 10k
 R4 4 5 10k
 
-OP 5 2 4 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+OP 5 2 4 10 11 TL072
 
 .input 1
 .output 5
+.include circuits/models/opamps.lib
 .probe opamp-04-non-inverting-summing-amplifier.csv V(1) V(5)
 

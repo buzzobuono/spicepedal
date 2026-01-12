@@ -1,7 +1,7 @@
 * Tremolo
 
-B_LFO 0 0 V=modulation:=(depth * sin(2 * 3.14 * speed * t))
-B_GAIN 2 0 V=V1 * (1 + modulation)
+B_LFO 0 0 Rs=1 V="modulation:=(depth * sin(2 * 3.14 * speed * t))"
+B_GAIN 2 0 V="V(1) * (1 + modulation)" Rs=1
 
 .param speed 8
 .param depth 0.8

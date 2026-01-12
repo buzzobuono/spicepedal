@@ -1,9 +1,0 @@
-.title Rectifier
-
-E_gain 2 0 1 0 Gain=10 Vmax=15 Vmin=-15 Rout=1
-D1 2 3 1N4148 Is=5.3e-9 N=1.68 Vt=0.02585 Cj0=1.15e-12 Vj=0.74 Mj=0.02
-R1 3 0 10k
-
-.input 1
-.output 3
-.probe rectifier.csv V(1) V(3)

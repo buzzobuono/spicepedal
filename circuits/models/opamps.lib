@@ -1,0 +1,3 @@
+* OpAmps
+.model TL072 O Rout=75 Imax=0.020 Gain=10000 Sr=13
+* 

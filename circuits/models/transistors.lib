@@ -1,0 +1,5 @@
+* Transistor NPN
+.model 2N5088 Q Bf=1.122k Br=1.271 Is=5.911e-15 Vt=0.02585
+.model BC549BP Q Bf=400 Br=6 Is=1.8e-14 Vt=0.02585
+.model Q2N2222 Q Is=14.34e-15 Bf=255.9 Br=6.092 Vt=0.02585
+* 

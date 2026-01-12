@@ -64,13 +64,27 @@ public:
             std::cerr << "Cannot open netlist: " << filename << std::endl;
             return false;
         }
+        std::ostringstream ss;
+        ss << file.rdbuf();
+        std::string netlistContent = ss.str();
+
+        netlistContent = preprocessNetlist(netlistContent);
         
+        std::ofstream dbg("debug.cir");
+        dbg << netlistContent;
+        dbg.close();
+        
+        std::istringstream fileStream(netlistContent);
         std::string line;
         int max_node = 0;
         
         std::cout << "Circuit Creation"<< std::endl;
-        while (std::getline(file, line)) {
+        while (std::getline(fileStream, line)) {
             if (line.empty() || line[0] == '*' || line[0] == '#') continue;
+            size_t commentPos = line.find(';');
+            if (commentPos != std::string::npos) {
+                line.erase(commentPos);
+            }
             
             std::istringstream iss(line);
             std::string comp_name;
@@ -83,34 +97,49 @@ public:
             switch(type) {
                 case 'R': {
                     int n1, n2;
-                    double v;
-                    std::string unit;
-                    iss >> n1 >> n2 >> v >> unit;
-                    v *= parseUnit(unit);
+                    std::string value;
+                    iss >> n1 >> n2 >> value;
+                    double v = parseNumericValue(value);
                     components.push_back(std::make_unique<Resistor>(comp_name, n1, n2, v));
-                    std::cout << "   Component Resistor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << v << std::endl;
+                    std::cout << "   Component Resistor name=" << comp_name 
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << " v=" << v
+                    << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case 'C': {
                     int n1, n2;
+                    std::string value;
                     double v;
-                    std::string unit;
-                    iss >> n1 >> n2 >> v >> unit;
-                    v *= parseUnit(unit);
+                    iss >> n1 >> n2 >> value;
+                    v = parseNumericValue(value);
                     components.push_back(std::make_unique<Capacitor>(comp_name, n1, n2, v));
-                    std::cout << "   Component Capacitor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << v << std::endl;
+                    std::cout << "   Component Capacitor name=" << comp_name
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    <<" v=" << v
+                    << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case 'L': {
                     int n1, n2;
-                    double l;
-                    std::string unit;
-                    iss >> n1 >> n2 >> l >> unit;
-                    l *= parseUnit(unit);
-                    components.push_back(std::make_unique<Inductor>(comp_name, n1, n2, l, 100));
-                    std::cout << "   Component Inductor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" l=" << l << std::endl;
+                    std::string value;
+                    double v;
+                    iss >> n1 >> n2 >> value;
+                    v = parseNumericValue(value);
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double rs = parseNumericValue(parseAttributeValue(attributes, "Rs", "100"));
+                    components.push_back(std::make_unique<Inductor>(comp_name, n1, n2, v, rs));
+                    std::cout << "   Component Inductor name=" << comp_name
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << " v=" << v
+                    << " rs=" << rs
+                    << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
@@ -118,20 +147,25 @@ public:
                     int n1, n2;
                     std::string model;
                     iss >> n1 >> n2 >> model;
-                    double Is, n, Vt;
-                    double Cj0;   // Capacità (0 = disabilita)
-                    double Vj;
-                    double Mj;
-                    std::string token;
-                    while (iss >> token) {
-                        if (token.find("Is=") == 0) Is = std::stod(token.substr(3));
-                        else if (token.find("N=") == 0) n = std::stod(token.substr(2));
-                        else if (token.find("Vt=") == 0) Vt = std::stod(token.substr(3));
-                        else if (token.find("Cj0=") == 0) Cj0 = std::stod(token.substr(4));
-                        else if (token.find("Vj=") == 0) Vj = std::stod(token.substr(3));
-                        else if (token.find("Mj=") == 0) Mj = std::stod(token.substr(3));
-                    }
-                    std::cout << "   Component Diode name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double Is = parseNumericValue(parseAttributeValue(attributes, "Is", "1e-14"));
+                    double n = parseNumericValue(parseAttributeValue(attributes, "N", "1"));
+                    double Vt = parseNumericValue(parseAttributeValue(attributes, "Vt", "0.02585"));
+                    double Cj0 = parseNumericValue(parseAttributeValue(attributes, "Cj0", "0"));
+                    double Vj = parseNumericValue(parseAttributeValue(attributes, "Vj", "1"));
+                    double Mj = parseNumericValue(parseAttributeValue(attributes, "Mj", "0.5"));
+                    std::cout << "   Component Diode name=" << comp_name
+                    << " model=" << model
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << " Is=" << Is
+                    << " N=" << n
+                    << " Vt=" << Vt
+                    << " Cj0=" << Cj0
+                    << " Vj=" << Vj
+                    << " Mj=" << Mj
+                    << std::endl;
                     components.push_back(std::make_unique<Diode>(comp_name, n1, n2, Is, n, Vt, Cj0, Vj, Mj));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
@@ -140,47 +174,41 @@ public:
                     int nc, nb, ne;
                     std::string model;
                     iss >> nc >> nb >> ne >> model;
-                    double Is, Bf, Br, Vt;
-                    std::string token;
-                    while (iss >> token) {
-                        if (token.find("Is=") == 0) {
-                            Is = std::stod(token.substr(3));
-                        } else if (token.find("Bf=") == 0) {
-                            Bf = std::stod(token.substr(3));
-                        } else if (token.find("Br=") == 0) {
-                            Br = std::stod(token.substr(3));
-                        } else if (token.find("Vt=") == 0) {
-                            Vt = std::stod(token.substr(3));
-                        }
-                    }
-                    std::cout << "   Component Transistor name=" << comp_name << " model=" << model << " nc=" << nc << " nb=" << nb << " ne=" << ne <<" Is=" << Is << " Bf=" << Bf << " Br=" << Br << " Vt=" << Vt << std::endl;
-                    components.push_back(std::make_unique<BJT>(
-                        comp_name,           // name
-                        nc,                  // collector node
-                        nb,                  // base node  
-                        ne,                  // emitter node
-                        Bf,                  // beta (forward beta)
-                        Br,                  // beta (reverse beta)
-                        Is,                  // saturation current
-                        Vt                   // Thermal voltage
-                    ));
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double Is = parseNumericValue(parseAttributeValue(attributes, "Is", "1e-14"));
+                    double Bf = parseNumericValue(parseAttributeValue(attributes, "Bf", "100"));
+                    double Br = parseNumericValue(parseAttributeValue(attributes, "Br", "1"));
+                    double Vt = parseNumericValue(parseAttributeValue(attributes, "Vt", "0.02585"));
+                    std::cout << "   Component Transistor name=" << comp_name
+                    << " model=" << model
+                    << " nc=" << nc
+                    << " nb=" << nb
+                    << " ne=" << ne
+                    << " Is=" << Is 
+                    << " Bf=" << Bf
+                    << " Br=" << Br
+                    << " Vt=" << Vt
+                    << std::endl;
+                    components.push_back(std::make_unique<BJT>(comp_name, nc, nb, ne, Bf, Br, Is, Vt));
                     max_node = std::max({max_node, nc, nb, ne});
                     break;
                 }
                 case 'V': {
                     int n1, n2;
-                    std::string model;
-                    double value;
-                    double rs = 1;
+                    std::string model, value;
                     iss >> n1 >> n2 >> model >> value;
-                    std::string token;
-                    while (iss >> token) {
-                        if (token.find("Rs=") == 0) {
-                            rs = std::stod(token.substr(3));
-                        }
-                    }
-                    auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value, rs);
-                    std::cout << "   Component VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value <<" Rs=" << rs << std::endl;
+                    double v = parseNumericValue(value);
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double rs = parseNumericValue(parseAttributeValue(attributes, "Rs", "1"));
+                    auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, v, rs);
+                    std::cout << "   Component VoltageSource name=" << comp_name
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << " v=" << value
+                    << " Rs=" << rs
+                    << std::endl;
                     components.push_back(std::move(vs));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
@@ -189,55 +217,53 @@ public:
                     int n1, n2;
                     iss >> n1 >> n2;
                     auto wire = std::make_unique<Wire>(comp_name, n1, n2);
-                    std::cout << "   Component Wire name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
+                    std::cout << "   Component Wire name=" << comp_name
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << std::endl;
                     components.push_back(std::move(wire));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case 'P': {
-                    int n1, n2, nw;
-                    double r_total, pos;
-                    std::string taper_str, unit;
                     // P1 1 2 3 10k 0.5 LOG
-                    iss >> n1 >> n2 >> nw >> r_total >> unit >> pos >> taper_str;
-                    r_total *= parseUnit(unit);
-
-                    Potentiometer::TaperType taper = Potentiometer::TaperType::LINEAR;
-                    std::transform(taper_str.begin(), taper_str.end(), taper_str.begin(), ::toupper);
+                    int n1, n2, nw;
+                    std::string value;
+                    iss >> n1 >> n2 >> nw >> value;
+                    v = parseNumericValue(value);
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    std::string taper_str = parseAttributeValue(attributes, "Taper", "LIN")
                     if (taper_str == "LOG" || taper_str == "A")
                         taper = Potentiometer::TaperType::LOGARITHMIC;
                     else if (taper_str == "LIN" || taper_str == "B")
                         taper = Potentiometer::TaperType::LINEAR;
                     else
-                        std::cerr << "   Warning: Potentiometer taper '" << taper_str << "' not recognized, using LINEAR" << std::endl;
-                    components.push_back(std::make_unique<Potentiometer>(comp_name, n1, n2, nw, r_total, pos, taper));
-                    std::cout << "   Component Potentiometer name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " nw=" << nw << " Rtot=" << r_total << " pos=" << pos << " taper=" << taper_str << std::endl;
+                        throw std::runtime_error("Potentiometer taper not recognized:" + taper_str);
+                    double pos = parseNumericValue(parseAttributeValue(attributes, "Pos", "0.5"));
+                    components.push_back(std::make_unique<Potentiometer>(comp_name, n1, n2, nw, v, pos, taper));
+                    std::cout << "   Component Potentiometer name=" << comp_name
+                    << " n1=" << n1
+                    << " n2=" << n2
+                    << " nw=" << nw
+                    << " v=" << r_total
+                    << " Taper=" << taper_str
+                    << " Pos=" << pos
+                    << std::endl;
                     max_node = std::max({max_node, n1, n2, nw});
                     break;
                 }
                 case 'O': {
                     int n_out, n_plus, n_minus, n_vcc, n_vee;
-                    double r_out, i_max, gain, sr;
                     std::string model;
                     iss >> n_out >> n_plus >> n_minus >> n_vcc >> n_vee >> model;
-                    std::string token;
-                    while (iss >> token) {
-                        if (token.find("Rout=") == 0) {
-                            r_out = std::stod(token.substr(5));
-                        } else if (token.find("Imax=") == 0) {
-                            i_max = std::stod(token.substr(5));
-                        } else if (token.find("Gain=") == 0) {
-                            gain = std::stod(token.substr(5));
-                        } else if (token.find("Sr=") == 0) {
-                            sr = std::stod(token.substr(3)) * 1e6;  // Assume input in V/µs
-                        }
-                    }
-                    
-                    components.push_back(std::make_unique<OpAmp>(
-                       comp_name, n_out, n_plus, n_minus, n_vcc, n_vee,
-                       r_out, i_max, gain, sr
-                    ));
-    
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double r_out = parseNumericValue(parseAttributeValue(attributes, "Rout", "75"));
+                    double i_max = parseNumericValue(parseAttributeValue(attributes, "Imax", "20m"));
+                    double gain = parseNumericValue(parseAttributeValue(attributes, "Gain", "100k"));
+                    double sr = parseNumericValue(parseAttributeValue(attributes, "Sr", "13")); // Assume input in V/µs
+                    components.push_back(std::make_unique<OpAmp>(comp_name, n_out, n_plus, n_minus, n_vcc, n_vee, r_out, i_max, gain, sr));
                     std::cout << "   Component OpAmp name=" << comp_name
                     << " model=" << model
                     << " out=" << n_out
@@ -250,7 +276,6 @@ public:
                     << " Gain=" << gain
                     << " Sr=" << sr
                     << std::endl;
-                    
                     max_node = std::max({max_node, n_out, n_plus, n_minus, n_vcc, n_vee});
                     break;
                 }
@@ -292,49 +317,23 @@ public:
                     << " Vmin=" << v_min
                     << " Rout=" << r_out
                     << std::endl;
-                    
                     max_node = std::max({max_node, n_out_p, n_out_m, n_ctrl_p, n_ctrl_m});
                     break;
                 }
                 case 'B': {
                     int n1, n2;
-                    std::string expr_part;
-                    double rs = 1e-3;
-                    iss >> n1 >> n2;                    
-                    std::string remainder;
-                    std::getline(iss, remainder);
-                    
-                    // Cerchiamo se l'utente ha specificato Rs=... alla fine della riga
-                    size_t rs_pos = remainder.find("Rs=");
-                    std::string expression;
-                    
-                    if (rs_pos != std::string::npos) {
-                        expression = remainder.substr(0, rs_pos);
-                        std::string rs_val = remainder.substr(rs_pos + 3);
-                        // Rimuoviamo eventuali spazi bianchi
-                        rs_val.erase(std::remove_if(rs_val.begin(), rs_val.end(), ::isspace), rs_val.end());
-                        if (!rs_val.empty()) rs = std::stod(rs_val);
-                    } else {
-                        expression = remainder;
-                    }
-                    
-                    // Pulizia dell'espressione (rimuove il prefisso "V=" se presente stile LTspice)
-                    size_t v_eq_pos = expression.find("V=");
-                    if (v_eq_pos != std::string::npos) {
-                        expression = expression.substr(v_eq_pos + 2);
-                    }
-                    
-                    // Rimuoviamo spazi iniziali/finali rimasti
-                    expression.erase(0, expression.find_first_not_of(" \t"));
-                    expression.erase(expression.find_last_not_of(" \t") + 1);
-
+                    iss >> n1 >> n2;
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    std::string expression = parseAttributeValue(attributes, "V", std::string(""));
+                    double rs = parseNumericValue(parseAttributeValue(attributes, "Rs", "1m"));
                     auto b_source = std::make_unique<BehavioralVoltageSource>(comp_name, n1, n2, expression, rs);
-                    
                     std::cout << "   Component BehavioralVoltageSource name=" << comp_name 
-                              << " n1=" << n1 << " n2=" << n2 
-                              << " expr=\"" << expression << "\"" 
-                              << " Rs=" << rs << std::endl;
-                    
+                    << " n1=" << n1 
+                    << " n2=" << n2 
+                    << " V=\"" << expression << "\"" 
+                    << " Rs=" << rs
+                    << std::endl;
                     b_source->setParams(&(this->params));
                     components.push_back(std::move(b_source));
                     max_node = std::max(max_node, std::max(n1, n2));
@@ -411,12 +410,12 @@ public:
                         iss >> cap_name >> v0;
                         initial_conditions[cap_name] = v0;
                         std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
-                    } else if (directive == ".pot") {
+                    } else if (directive == ".ctrl") {
                         int id;
                         std::string comp_name;
                         iss >> id >> comp_name;
                         pending_params.push_back({id, comp_name});
-                        std::cout << "   Directive Pot: id=" << id << " comp=" << comp_name << std::endl;
+                        std::cout << "   Directive Ctrl: id=" << id << " comp=" << comp_name << std::endl;
                     } else if (directive == ".param") {
                         std::string p_name;
                         double p_val;
@@ -433,9 +432,9 @@ public:
 
         }
         std::cout << std::endl;
-
+        
         num_nodes = max_node + 1;
-
+        
         std::cout << "Linked Params"<< std::endl;
         for (auto& [id, comp_name] : pending_params) {
             bool found = false;
@@ -543,6 +542,98 @@ private:
             ;
         }
     }
+    
+    double parseNumericValue(const std::string& valStr) {
+        if (valStr.empty()) return 0.0;
+        size_t firstChar = valStr.find_first_not_of("0123456789e.-+");
+        if (firstChar == std::string::npos) {
+            return std::stod(valStr);
+        }
+        std::string numPart = valStr.substr(0, firstChar);
+        std::string unitPart = valStr.substr(firstChar);
+        return std::stod(numPart) * parseUnit(unitPart);
+    }
+    
+    std::string parseAttributeValue(const std::string& line, const std::string& key, const std::string& defaultValue) {
+        const auto pos = line.find(key + "=");
+        if (pos == std::string::npos) return defaultValue;
+        size_t i = pos + key.size() + 1;
+        while (i < line.size() && std::isspace(static_cast<unsigned char>(line[i]))) ++i;
+        size_t end;
+        std::string val;
+        if (i < line.size() && line[i] == '"') {
+            end = line.find('"', ++i);
+            if (end == std::string::npos) return defaultValue;
+            val = line.substr(i, end - i);
+        } else {
+            end = line.find_first_of(" \t\r\n", i);
+            val = line.substr(i, (end == std::string::npos) ? std::string::npos : end - i);
+        }
+        if (val.empty()) return defaultValue;
+        return val;
+    }
+
+    std::string preprocessNetlist(const std::string &netlistText) {
+        std::vector<std::string> netlistLines;
+        std::istringstream file1(netlistText);
+        std::string line;
+        while (std::getline(file1, line)) {
+            std::istringstream iss(line);
+            std::string firstWord;
+            iss >> firstWord;
+            if (firstWord == ".include") {
+                std::string includePath;
+                iss >> includePath;
+                std::ifstream incFile(includePath);
+                if (!incFile.is_open()) {
+                    throw std::runtime_error("Cannot open include file: " + includePath);
+                }
+                std::string incLine;
+                while (std::getline(incFile, incLine)) {
+                    netlistLines.push_back(incLine);
+                }
+                continue;
+            }
+            netlistLines.push_back(line);
+        }
+
+        std::unordered_map<std::string, std::string> modelAttributes;
+        for (auto &l : netlistLines) {
+            std::istringstream iss(l);
+            std::string firstWord;
+            iss >> firstWord;
+            if (firstWord == ".model") {
+                std::string modelName, type;
+                iss >> modelName >> type;
+                std::string attributes;
+                std::getline(iss, attributes);
+                modelAttributes[modelName] = attributes;
+            }
+        }
+
+        std::ostringstream output;
+        for (auto l : netlistLines) {
+            std::istringstream iss(l);
+            std::string firstWord;
+            iss >> firstWord;
+            if (firstWord.empty()) {
+                output << l << std::endl;
+                continue;
+            }
+            char lineType = firstWord[0];
+            if (lineType != 'D' && lineType != 'Q' && lineType != 'O') {
+                output << l << std::endl;
+                continue;
+            }
+            for (const auto& [modelName, attrs] : modelAttributes) {
+                std::regex re("\\b" + modelName + "\\b");
+                l = std::regex_replace(l, re, modelName + attrs);
+            }
+            output << l << std::endl;
+        }
+        return output.str();
+    }
+    
 };
 
 #endif

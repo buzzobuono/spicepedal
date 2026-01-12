@@ -30,5 +30,5 @@ Pvol0 5 0 7 100k 0.95 LOG
 .output 7
 .ic C3 4.517
 .warmup 50
-.param 0 Pvol0
+.ctrl 0 Pvol0
 .probe booster.csv V(input) V(1) V(7)

@@ -1,0 +1,11 @@
+* Diodi silicio standard
+.model 1N4148 D Is=5.3e-9 N=1.68 Vt=0.02585 Cj0=1.15e-12 Vj=0.74 Mj=0.02
+.model xD1N914 D Is=100e-15 N=1 Vt=0.026 Cj0=2e-12 Vj=0.75 Mj=0.5
+.model D1N914 D Is=2.52e-9 N=1.75 Vt=0.02585 Cj0=1.0e-12 Vj=0.75 Mj=0.33
+* Diodi piccoli segnali / Schottky
+.model BAT42W D Is=8.75e-5 N=3.51 Vt=0.02585 Cj0=8.88e-12 Vj=0.33 Mj=0.333
+.model BAT42 D Is=2.46e-6 N=1.70 Vt=0.02585 Cj0=1.33e-11 Vj=0.33 Mj=0.333
+.model BAT54 D Is=3.49e-5 N=2.28 Vt=0.02585 Cj0=1.33e-11 Vj=0.33 Mj=0.333
+* Diodi rettificatori Schottky
+.model 1N5819 D Is=3.90e-7 N=1.70 Vt=0.02585 Cj0=2.00e-10 Vj=0.45 Mj=0.333
+* 

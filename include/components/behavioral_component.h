@@ -5,6 +5,7 @@
 #include "external/exprtk.hpp"
 #include <string>
 #include <vector>
+#include <regex>
 
 class BehavioralComponent : public Component {
 protected:
@@ -24,15 +25,18 @@ protected:
         v_buffer.resize(V.size(), 0.0);
         v_nodes_prev.resize(V.size(), 0.0);
         
+        std::string processed_expr = expression_string;
+        processed_expr = std::regex_replace(processed_expr, std::regex("V\\((\\d+)\\)"), "V_$1_");
+        processed_expr = std::regex_replace(processed_expr, std::regex("Vprev\\((\\d+)\\)"), "Vp_$1_");
+        
         for (int i = 0; i < V.size(); ++i) {
-            symbol_table.add_variable("V" + std::to_string(i), v_buffer[i]);
-            symbol_table.add_variable("V" + std::to_string(i) + "prev", v_nodes_prev[i]);
+            symbol_table.add_variable("V_" + std::to_string(i) + "_", v_buffer[i]);
+            symbol_table.add_variable("Vprev_" + std::to_string(i) + "_", v_nodes_prev[i]);
         }
         
         symbol_table.add_variable("dt", dt_internal);
         symbol_table.add_variable("t", time_internal);
 
-        // Registra parametri dal registro globale
         if (params) {
             for (auto const& [name, value] : params->getAll()) {
                 symbol_table.add_variable(name, *params->getPtr(name));
@@ -41,14 +45,13 @@ protected:
         
         expression.register_symbol_table(symbol_table);
 
-        if (!parser.compile(expression_string, expression)) {
+        if (!parser.compile(processed_expr, expression)) {
             std::cout << "[EXPRTK ERROR] " << parser.error() << " in expression: " << expression_string << std::endl;
             throw std::runtime_error("BehavioralComponent: expression syntax error");
         }
         is_initialized = true;
     }
 
-    // Metodo per aggiornare i buffer dei dati prima della valutazione
     void sync_variables(const Eigen::VectorXd& V, double dt) {
         dt_internal = dt;
         for (int i = 0; i < V.size(); ++i) {

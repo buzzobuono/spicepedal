@@ -2,10 +2,10 @@
 
 V1 1 0 DC 9
 R1 1 2 100k
-D1 2 3 D1N914 Is=100e-15 N=1 Vt=0.026 Cj0=2e-12 Vj=0.75 Mj=0.5
+D1 2 3 D1N914
 C2 2 4 0.1u
-Q1 2 3 0 2N5088 Bf=400 Br=1.271 Is=5.911e-15 Vt=0.026
-*Q1 2 3 0 BC549BP Bf=400 Br=35.5 Is=1.8e-14 Vt=0.026
+Q1 2 3 0 2N5088
+*Q1 2 3 0 BC549BP
 *Q1 2 3 0 NPN Bf=200 Br=1 Is=1e-14 Vt=0.026
 C1 5 3 4.7u
 R2 4 0 100M
@@ -14,8 +14,10 @@ Pvol0 4 0 7 100k 0.95 LOG
 
 .input 5
 .output 7
+.include circuits/models/diodes.lib
+.include circuits/models/transistors.lib
 .probe bazz-fuss.csv V(5)V(7)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2
-.pot 0 Pvol0
+.ctrl 0 Pvol0

@@ -6,10 +6,11 @@ VEE 11 0 DC -15
 R1 2 3 10k
 R2 2 0 1k
 
-OP 3 1 2 10 11 TL072 Rout=75 Imax=0.020 Gain=10000 Sr=13
+OP 3 1 2 10 11 TL072
 
 .input 1
 .output 3
+.include circuits/models/opamps.lib
 .probe opamp-03-non-inverting-amplifier.csv V(input) V(1) V(3)
 
 * V(3) = V(1) * ( 1 + R1 / R2 )
