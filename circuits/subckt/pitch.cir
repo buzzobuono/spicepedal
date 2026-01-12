@@ -8,36 +8,36 @@ R_HP 11 0 11k
 * 2. Passa-Basso del 3° Ordine (Taglio ~100Hz)
 * Stadio 1
 R_LP1 11 12 3.3k
-C_LP1 12 0 470e-8
+C_LP1 12 0 470n
 * Stadio 2
 R_LP2 12 13 3.3k
-C_LP2 13 0 470e-9
+C_LP2 13 0 470n
 * Stadio 3
 R_LP3 13 14 3.3k
-C_LP3 14 0 470e-9
+C_LP3 14 0 470n
 * Stadio 4
 R_LP3 14 2 3.3k
-C_LP3 2 0 470e-9
+C_LP3 2 0 470n
 
-Bgain 3 0 V=1000*V2 Rs=1
+Bgain 3 0 V="1000*V(2)" Rs=1
 
-*X1 3 4 PITCH thr=0.05 smooth=.7
-X1 3 4 FFTPITCH size=4096
+X1 3 4 PITCH thr=0.05 smooth=.7
+*X1 3 4 FFTPITCH size=4096
 *R_SMOOTH 4 9 47k
 *C_SMOOTH 9 0 220e-9
-*B_SNAP 10 0 V=clamp( (V4 > 1280 ? V4/32 : (V4 > 640 ? V4/16 : (V4 > 320 ? V4/8 : (V4 > 160 ? V4/4 : (V4 > 80 ? V4/2 : (V4 < 20 ? V4*4 : (V4 < 40 ? V4*2 : V4))))))), 40, 80) Rs=1
-*B_SNAP 10 0 V=(V4 > 320 ? V4/8 : (V4 > 160 ? V4/4 : V4 )) Rs=1
+*B_SNAP 10 0 V="clamp( (V(4) > 1280 ? V(4)/32 : (V(4) > 640 ? V(4)/16 : (V(4) > 320 ? V(4)/8 : (V(4) > 160 ? V(4)/4 : (V(4) > 80 ? V(4)/2 : (V(4) < 20 ? V(4)*4 : (V(4) < 40 ? V(4)*2 : V(4)))))))), 40, 80)" Rs=1
+*B_SNAP 10 0 V="(V(4) > 320 ? V(4)/8 : (V(4) > 160 ? V(4)/4 : V(4) ))" Rs=1
 X2 4 5 INTEGRATOR
 
-*B_ENV 8 0 V=0.8+0.2*sin(2*3.1415*t*8) Rs=1000
+*B_ENV 8 0 V="0.8+0.2*sin(2*3.1415*t*8)" Rs=1000
 
-*B1 6 0 V=sin(2*3.14159*V5) Rs=1
-B1 6 0 V=sgn(sin(2*3.14159*V5)) Rs=1
-*B1 6 0 V=(V5-floor(V5+0.5)) Rs=1
-*B1 6 0 V=4*V8*sin(2*3.14159*V5 + 0.5*sin(2*3.14159*V5*2.5))
-*B1 6 0 V=tanh(V8*sin(2*3.14159*V5)*2) Rs=1
-*B1 6 0 V=max(-0.8, min(0.8, 2*sin(2*3.14159*V5))) Rs=1
-*B1 6 0 V=5*V8*clamp(2 * (V5 - floor(V5 + 0.5)), -1, 1) Rs=1
+*B1 6 0 V="sin(2*3.14159*V(5))" Rs=1
+B1 6 0 V="sgn(sin(2*3.14159*V(5)))" Rs=1
+*B1 6 0 V="(V(5)-floor(V(5)+0.5))" Rs=1
+*B1 6 0 V="4*V(8)*sin(2*3.14159*V(5) + 0.5*sin(2*3.14159*V(5)*2.5))" Rs=1
+*B1 6 0 V="tanh(V(8)*sin(2*3.14159*V(5))*2)" Rs=1
+*B1 6 0 V="max(-0.8, min(0.8, 2*sin(2*3.14159*V(5))))" Rs=1
+*B1 6 0 V="5*V(8)*clamp(2 * (V(5) - floor(V(5) + 0.5)), -1, 1)" Rs=1
 
 
 

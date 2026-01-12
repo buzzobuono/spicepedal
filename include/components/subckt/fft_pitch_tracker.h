@@ -1,4 +1,4 @@
-#include <fftw3.h>
+//#include <fftw3.h>
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -10,9 +10,9 @@ private:
     std::vector<double> buffer;
     int buffer_ptr = 0;
     
-    double *fft_in;
-    fftw_complex *fft_out;
-    fftw_plan plan;
+    //double *fft_in;
+    //fftw_complex *fft_out;
+    //fftw_plan plan;
 
     double current_freq = 0;
     double sample_rate = 44100.0;
@@ -25,15 +25,15 @@ public:
         type = ComponentType::SUBCIRCUIT;
         buffer.resize(buffer_size, 0.0);
         
-        fft_in = (double*) fftw_malloc(sizeof(double) * buffer_size);
-        fft_out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * (buffer_size / 2 + 1));
-        plan = fftw_plan_dft_r2c_1d(buffer_size, fft_in, fft_out, FFTW_ESTIMATE);
+        //fft_in = (double*) fftw_malloc(sizeof(double) * buffer_size);
+        //fft_out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * (buffer_size / 2 + 1));
+        //plan = fftw_plan_dft_r2c_1d(buffer_size, fft_in, fft_out, FFTW_ESTIMATE);
     }
 
     ~FFTPitchTracker() {
-        fftw_destroy_plan(plan);
-        fftw_free(fft_in);
-        fftw_free(fft_out);
+        //fftw_destroy_plan(plan);
+        //fftw_free(fft_in);
+        //fftw_free(fft_out);
     }
 
     void updateHistory(const Eigen::VectorXd& V, double dt) override {

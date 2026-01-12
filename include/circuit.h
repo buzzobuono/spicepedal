@@ -230,10 +230,11 @@ public:
                     int n1, n2, nw;
                     std::string value;
                     iss >> n1 >> n2 >> nw >> value;
-                    v = parseNumericValue(value);
+                    double v = parseNumericValue(value);
                     std::string attributes;
                     std::getline(iss, attributes);
-                    std::string taper_str = parseAttributeValue(attributes, "Taper", "LIN")
+                    std::string taper_str = parseAttributeValue(attributes, "Taper", "LIN");
+                    Potentiometer::TaperType taper;
                     if (taper_str == "LOG" || taper_str == "A")
                         taper = Potentiometer::TaperType::LOGARITHMIC;
                     else if (taper_str == "LIN" || taper_str == "B")
@@ -246,7 +247,7 @@ public:
                     << " n1=" << n1
                     << " n2=" << n2
                     << " nw=" << nw
-                    << " v=" << r_total
+                    << " v=" << value
                     << " Taper=" << taper_str
                     << " Pos=" << pos
                     << std::endl;
@@ -283,30 +284,15 @@ public:
                     int n_out_p;
                     int n_out_m;
                     int n_ctrl_p;
-                    int n_ctrl_m;  
-                    double gain;
-                    double v_max;
-                    double v_min;
-                    double r_out;
+                    int n_ctrl_m;
                     iss >> n_out_p >> n_out_m >> n_ctrl_p >> n_ctrl_m;
-                    std::string token;
-                    while (iss >> token) {
-                        if (token.find("Rout=") == 0) {
-                            r_out = std::stod(token.substr(5));
-                        } else if (token.find("Vmax=") == 0) {
-                            v_max = std::stod(token.substr(5));
-                        } else if (token.find("Vmin=") == 0) {
-                            v_min = std::stod(token.substr(5));
-                        } else if (token.find("Gain=") == 0) {
-                            gain = std::stod(token.substr(5));
-                        }
-                    }
-                    
-                    components.push_back(std::make_unique<VCVS>(
-                       comp_name, n_out_p, n_out_m, n_ctrl_p, n_ctrl_m,
-                       gain, v_max, v_min, r_out
-                    ));
-    
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    double r_out = parseNumericValue(parseAttributeValue(attributes, "Rout", "75"));
+                    double v_max = parseNumericValue(parseAttributeValue(attributes, "Vmax", "15"));
+                    double v_min = parseNumericValue(parseAttributeValue(attributes, "Vmin", "-15"));
+                    double gain = parseNumericValue(parseAttributeValue(attributes, "Gain", "100k"));
+                    components.push_back(std::make_unique<VCVS>(comp_name, n_out_p, n_out_m, n_ctrl_p, n_ctrl_m, gain, v_max, v_min, r_out));    
                     std::cout << "   Component VCVS name=" << comp_name
                     << " n_out_p=" << n_out_p
                     << " n_out_m=" << n_out_m

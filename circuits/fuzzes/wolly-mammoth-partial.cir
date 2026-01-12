@@ -10,13 +10,13 @@ Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 
 * Pinch pot
 R2 3 4 100k
-Ppinch 4 5 8 500k .5 LIN
+Ppinch 4 5 8 500k Pos=0.5 Taper=LIN
 W1 8 5
 
 * Wool pot
 C6 5 6 100e-6
 R1 8 0 2.2k
-Pwool 6 10 0 2k .5 LIN
+Pwool 6 10 0 2k Pos=0.5 Taper=LIN
 
 C1 7 3 0.22e-6
 C2 3 0 10e-9

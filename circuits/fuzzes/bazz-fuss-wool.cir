@@ -10,13 +10,13 @@ C1 5 3 4.7e-6
 * WOOL CONTROL
 C_wool 2 6 1e-6
 *R_wool 6 0 10k
-Pwool 0 6 9 25k 0.5 LIN
+Pwool 0 6 9 25k Pos=0.5 Taper=LIN
 Rwoolload 9 0 10k
 
 * EQ CONTROL
 C_eq 4 7 220e-9
 *R_eq 7 0 1M
-Peq 0 7 10 1M 0.5 LIN
+Peq 0 7 10 1M Pos=0.5 Taper=LIN
 Reqload 10 0 1
 
 .input 5

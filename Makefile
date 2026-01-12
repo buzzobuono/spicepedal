@@ -25,7 +25,7 @@ BIN_INSTALL_DIR = $(HOME)/bin
 all: spicepedal spicepedal-stream spicepedal-plot 
 
 spicepedal: clean_spicepedal create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG} ${LIBS_FFTW3}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG}
 
 spicepedal-stream: clean_spicepedal-stream create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${LIBS_FFTW3} ${DEBUG}

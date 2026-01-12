@@ -10,13 +10,14 @@ Q1 2 3 0 2N5088
 C1 5 3 4.7u
 R2 4 0 100M
 
-Pvol0 4 0 7 100k 0.95 LOG
+Pvol0 4 0 7 100k Pos=0.95 Taper=LOG
 
 .input 5
 .output 7
 .include circuits/models/diodes.lib
 .include circuits/models/transistors.lib
-.probe bazz-fuss.csv V(5)V(7)
+.probe bazz-fuss.csv V(5)
+V(7)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2
