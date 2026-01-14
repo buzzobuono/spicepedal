@@ -27,6 +27,7 @@
 #include "components/wire.h"
 #include "components/vcvs.h"
 #include "components/behavioral_voltage_source.h"
+#include "components/parameter_evaluator.h"
 #include "components/subckt/pitch_tracker.h"
 #include "components/subckt/fft_pitch_tracker.h"
 #include "components/subckt/integrator.h"
@@ -226,7 +227,7 @@ public:
                     break;
                 }
                 case 'P': {
-                    // P1 1 2 3 10k 0.5 LOG
+                    // P1 1 2 3 10k Pos=0.5 Taper=LOG
                     int n1, n2, nw;
                     std::string value;
                     iss >> n1 >> n2 >> nw >> value;
@@ -323,6 +324,26 @@ public:
                     b_source->setParams(&(this->params));
                     components.push_back(std::move(b_source));
                     max_node = std::max(max_node, std::max(n1, n2));
+                    break;
+                }
+                case 'A': {
+                    // A1 param="formula"
+                    std::streampos p = iss.tellg();
+                    std::string param;
+                    getline(iss, param, '=');
+                    std::stringstream ss(param);
+                    ss >> param;
+                    iss.seekg(p);
+                    std::string attributes;
+                    std::getline(iss, attributes);
+                    std::string expression = parseAttributeValue(attributes, param, std::string(""));
+                    auto param_eval = std::make_unique<ParameterEvaluator>(comp_name, param, expression);
+                    std::cout << "   Component ParameterEvaluator name=" << comp_name 
+                    << " param=" << param
+                    << " expression=\"" << expression << "\""
+                    << std::endl;
+                    param_eval->setParams(&(this->params));
+                    components.push_back(std::move(param_eval));
                     break;
                 }
                 case 'X': {

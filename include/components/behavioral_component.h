@@ -18,6 +18,7 @@ protected:
     mutable std::vector<double> v_nodes_prev;
     mutable double dt_internal = 0.0;
     mutable double time_internal = 0.0;
+    mutable std::map<std::string, double> params_prev_buffer;
     
     bool is_initialized = false;
 
@@ -27,7 +28,8 @@ protected:
         
         std::string processed_expr = expression_string;
         processed_expr = std::regex_replace(processed_expr, std::regex("V\\((\\d+)\\)"), "V_$1_");
-        processed_expr = std::regex_replace(processed_expr, std::regex("Vprev\\((\\d+)\\)"), "Vp_$1_");
+        processed_expr = std::regex_replace(processed_expr, std::regex("Vprev\\((\\d+)\\)"), "Vprev_$1_");
+        processed_expr = std::regex_replace(processed_expr, std::regex("prev\\((\\w+)\\)"), "prev_$1_");
         
         for (int i = 0; i < V.size(); ++i) {
             symbol_table.add_variable("V_" + std::to_string(i) + "_", v_buffer[i]);
@@ -40,6 +42,8 @@ protected:
         if (params) {
             for (auto const& [name, value] : params->getAll()) {
                 symbol_table.add_variable(name, *params->getPtr(name));
+                params_prev_buffer[name] = value;
+                symbol_table.add_variable("prev_" + name + "_", params_prev_buffer[name]);
             }
         }
         
@@ -64,6 +68,11 @@ public:
         time_internal += dt; 
         for(int i=0; i < V.size(); ++i) {
             v_nodes_prev[i] = V(i);
+        }
+        if (params) {
+            for (auto const& [name, value] : params->getAll()) {
+                params_prev_buffer[name] = value;
+            }
         }
     }
 };

@@ -6,11 +6,11 @@ private:
     std::string target_param;
 
 public:
-    ParameterEvaluator(const std::string& comp_name, const std::string& target, const std::string& expr)
-        : target_param(target) {
+    ParameterEvaluator(const std::string& comp_name, const std::string& param, const std::string& expr)
+        : target_param(param) {
         name = comp_name;
         expression_string = expr;
-        type = ComponentType::PARAM_EVALUATOR;
+        type = ComponentType::PARAMETER_EVALUATOR;
         nodes = {}; 
     }
 
@@ -18,10 +18,10 @@ public:
         if (!is_initialized) init_exprtk(V);
         
         sync_variables(V, dt);
-        last_value = expression.value();
+        double value = expression.value();
 
         if (params) {
-            *params->getPtr(target_param) = last_value;
+            *params->getPtr(target_param) = value;
         }
     }
 };

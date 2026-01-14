@@ -31,7 +31,7 @@ spicepedal-stream: clean_spicepedal-stream create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${LIBS_FFTW3} ${DEBUG}
 
 spicepedal-plot: clean_spicepedal-plot create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${DEBUG} ${LIBS_FFTW3}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_plot.cpp -o bin/spicepedal-plot ${LIBS_FFTW3} ${DEBUG}
 
 install: all
 	@mkdir -p $(BIN_INSTALL_DIR)

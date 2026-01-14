@@ -1,0 +1,20 @@
+A_ENV env="prev(env) * 0.98 + abs(V(1)) * 0.02"
+
+.param Q 15
+A_FREQ fc="1000 + env * 500"
+
+A_K k="6.283 * fc * dt"
+
+A_BP bp="(V(1) - prev(lp) - (prev(bp) / Q)) / (1 + k/Q)"
+A_LP lp="prev(lp) + k * bp"
+
+*B_OUT 2 0 V="(V(1) * 0.4) + (bp * Q * 0.8)"
+B_OUT 2 0 V="Q*bp"
+
+.param env 0.5
+.param fc 0
+.param lp 0
+.param bp 0
+.probe test.csv V(1) V(2)
+.input 1
+.output 2

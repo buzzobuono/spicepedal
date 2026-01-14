@@ -1,0 +1,16 @@
+* 1. Inviluppo (Usa Vprev per essere ultra-stabile)
+A_ENV env="(abs(V(1)) * 0.05) + (env * 0.95)"
+
+* 2. Calcolo K dinamico (dipendente dalla frequenza di taglio)
+A_WAH K="dt * 2 * 3.14 * (500 + env * 2000)"
+
+* 3. Filtro Passa-Basso Digitale "Zero-Delay Style"
+* Nota: V(2) dipende da V(1) attuale e dal suo stesso passato Vprev(2)
+B_WAH 2 0 V="(Vprev(2) + K * V(1)) / (1 + K)" Rs=1
+
+
+.param env 0
+.param K 0
+
+.input 1
+.output 2

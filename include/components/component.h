@@ -17,6 +17,7 @@ enum class ComponentType {
     OPAMP,
     VCVS,
     BEHAVIORAL_VOLTAGE_SOURCE,
+    PARAMETER_EVALUATOR,
     SUBCIRCUIT
 };
 
