@@ -16,8 +16,7 @@ Pvol0 4 0 7 100k Pos=0.95 Taper=LOG
 .output 7
 .include circuits/models/diodes.lib
 .include circuits/models/transistors.lib
-.probe bazz-fuss.csv V(5)
-V(7)
+.probe bazz-fuss.csv V(5) V(7)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2

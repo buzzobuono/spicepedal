@@ -29,6 +29,7 @@
 #include "components/behavioral_voltage_source.h"
 #include "components/parameter_evaluator.h"
 #include "components/subckt/pitch_tracker.h"
+#include "components/subckt/pitch_tracker2.h"
 #include "components/subckt/fft_pitch_tracker.h"
 #include "components/subckt/integrator.h"
 
@@ -350,36 +351,49 @@ public:
                     int n1, n2;
                     std::string subckt;
                     iss >> n1 >> n2 >> subckt;
+                    std::string attributes;
+                    std::getline(iss, attributes);
                     if (subckt == "PITCH") {
-                        double thr = 0.02;
-                        double smooth = 0.2;
-                        std::string token;
-                        while (iss >> token) {
-                            if (token.find("thr=") == 0) {
-                                thr = std::stod(token.substr(4));
-                            } else if (token.find("smooth=") == 0) {
-                                smooth = std::stod(token.substr(7));
-                            }
-                        }
-                        std::cout << "   SubCircuit PITCH name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " thr=" << thr << " smooth=" << smooth << std::endl;
+                        double thr = parseNumericValue(parseAttributeValue(attributes, "thr", "0.02"));
+                        double smooth = parseNumericValue(parseAttributeValue(attributes, "smooth", "0.2"));
+                        std::cout << "   SubCircuit PITCH name=" << comp_name
+                        << " n1=" << n1
+                        << " n2=" << n2
+                        << " thr=" << thr
+                        << " smooth=" << smooth
+                        << std::endl;
                         components.push_back(std::make_unique<PitchTracker>(comp_name, n1, n2, thr, smooth));
+                    } if (subckt == "PITCH2") {
+                        std::string attributes;
+                        std::getline(iss, attributes);
+                        double thr = parseNumericValue(parseAttributeValue(attributes, "thr", "0.02"));
+                        int n_signal = std::stoi(parseAttributeValue(attributes, "nsig", "8"));
+                        int n_freq = std::stoi(parseAttributeValue(attributes, "nfreq", "4"));
+                        std::cout << "   SubCircuit PITCH2 name=" << comp_name 
+                        << " n1=" << n1
+                        << " n2=" << n2
+                        << " thr=" << thr
+                        << " nsig=" << n_signal
+                        << " nfreq=" << n_freq
+                        << std::endl;
+                        components.push_back(std::make_unique<PitchTracker2>(comp_name, n1, n2, thr, n_signal, n_freq));
                         max_node = std::max(max_node, std::max(n1, n2));
                     } else if (subckt == "FFTPITCH") {
-                        int size = 8192;
-                        std::string token;
-                        while (iss >> token) {
-                            if (token.find("size=") == 0) {
-                                size = std::stod(token.substr(5));
-                            }
-                        }
-                        std::cout << "   SubCircuit FFTPITCH name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " size=" << size << std::endl;
+                        int size = std::stoi(parseAttributeValue(attributes, "size", "8192"));
+                        std::cout << "   SubCircuit FFTPITCH name=" << comp_name
+                        << " n1=" << n1
+                        << " n2=" << n2
+                        << " size=" << size
+                        << std::endl;
                         components.push_back(std::make_unique<FFTPitchTracker>(comp_name, n1, n2, size));
-                        max_node = std::max(max_node, std::max(n1, n2));
                     } else if (subckt == "INTEGRATOR") {
-                        std::cout << "   SubCircuit INTEGRATOR name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
+                        std::cout << "   SubCircuit INTEGRATOR name=" << comp_name
+                        << " n1=" << n1
+                        << " n2=" << n2
+                        << std::endl;
                         components.push_back(std::make_unique<Integrator>(comp_name, n1, n2));
-                        max_node = std::max(max_node, std::max(n1, n2));
                     }
+                    max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case '.': {

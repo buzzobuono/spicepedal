@@ -1,6 +1,6 @@
 .title Woolly Mammoth
 
-VCC 9 0 DC 9V
+VCC 9 0 DC 9
 
 * Two stage amplifier
 R3 9 1 51k

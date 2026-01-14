@@ -1,6 +1,6 @@
 * Tremolo
 
-A_LFO modulation="(depth * sin(2 * 3.14 * speed * t))"
+A_LFO EVAL modulation="(depth * sin(2 * 3.14 * speed * t))"
 B_GAIN 2 0 V="V(1) * (1 + modulation)" Rs=1
 
 .param speed 8

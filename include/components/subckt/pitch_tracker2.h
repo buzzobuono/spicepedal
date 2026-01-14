@@ -1,11 +1,11 @@
-#ifndef PITCH_TRACKER_H
-#define PITCH_TRACKER_H
+#ifndef PITCH_TRACKER_2_H
+#define PITCH_TRACKER_2_H
 
 #include "components/component.h"
 #include <Eigen/Dense>
 #include <vector>
 
-class PitchTracker : public Component {
+class PitchTracker2 : public Component {
 private:
     int n_in, n_out;
     double threshold;
@@ -25,8 +25,8 @@ private:
     double smoothed_freq;
 
 public:
-    PitchTracker(const std::string& name, int in, int out, double thr = 0.02, int n_signal = 8, int n_freq = 4)
-        : n_in(in), n_out(out), threshold(thr), signal_n(n_signal), freq_n(n_freq) 
+    PitchTracker2(const std::string& name, int in, int out, double thr = 0.02, int n_signal = 8, int n_freq = 4)
+        : n_in(in), n_out(out), threshold(thr), signal_n(n_signal), freq_n(n_freq)
     {
         this->name = name;
         nodes = {n_in, n_out};
