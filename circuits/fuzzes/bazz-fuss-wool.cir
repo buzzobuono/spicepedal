@@ -22,5 +22,5 @@ Reqload 10 0 1
 .input 5
 .output 7
 .warmup 10
-.param 0 Pwool
-.param 1 Peq
+.ctrl 0 Pwool
+.ctrl 1 Peq

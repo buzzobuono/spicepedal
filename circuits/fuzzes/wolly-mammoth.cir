@@ -1,6 +1,6 @@
 .title Woolly Mammoth
 
-VCC 9 0 DC 9V
+VCC 9 0 DC 9
 
 * two stage amplifier
 
@@ -38,8 +38,8 @@ Pvol 13 0 14 10k Pos=0.9 Taper=LIN
 .input 7
 .output 14
 .warmup 60
-.param 0 Ppinch
-.param 1 Pwool
-.param 2 Peq
-.param 3 Pvol
+.ctrl 0 Ppinch
+.ctrl 1 Pwool
+.ctrl 2 Peq
+.ctrl 3 Pvol
 .probe wolly-mammoth.csv V(14)
