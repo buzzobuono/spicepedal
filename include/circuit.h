@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <locale>
+#include <filesystem>
 
 #include "utils/param_registry.h"
 #include "components/component.h"
@@ -42,6 +43,12 @@ struct ProbeTarget {
     std::string name;
 };
 
+struct CtrlParam {
+    std::string name;
+    double min;
+    double max;
+};
+
 class Circuit {
     
 public:
@@ -54,6 +61,7 @@ public:
     std::map<std::string, double> initial_conditions;
     std::vector<std::pair<int, std::string>> pending_params;
     std::map<int, Potentiometer*> param_map;
+    std::map<int, CtrlParam> ctrl_params;
     std::vector<ProbeTarget> probes;
     std::string probe_file;
 
@@ -407,7 +415,9 @@ public:
                     } else if (directive == ".probe") {
                         std::string token;
                         std::cout << "   Directive Probe:" << std::endl;
-                        iss >> probe_file;
+                        std::filesystem::path filepath(filename);
+                        probe_file = filepath.replace_extension(".csv").filename().string();
+                        
                         std::cout << "      File Name: " << probe_file << std::endl;
                         while (iss >> token) {
                             if (token[0] == 'V' && token[1] == '(') {
@@ -419,7 +429,7 @@ public:
                                 probes.push_back({ProbeTarget::Type::CURRENT, comp_str});
                                 std::cout << "      Current of Component: " << comp_str << std::endl;
                             } else {
-                                std::cerr << "      Warning: Unknown probe token " << token << std::endl;
+                                throw std::runtime_error("Unknown probe token: " + token);
                             }
                         }
                     } else if (directive == ".warmup") {
@@ -431,12 +441,25 @@ public:
                         iss >> cap_name >> v0;
                         initial_conditions[cap_name] = v0;
                         std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
-                    } else if (directive == ".ctrl") {
+                    } else if (directive == ".knob") {
                         int id;
                         std::string comp_name;
                         iss >> id >> comp_name;
                         pending_params.push_back({id, comp_name});
-                        std::cout << "   Directive Ctrl: id=" << id << " comp=" << comp_name << std::endl;
+                        std::cout << "   Directive Knob id=" << id <<
+                        " comp=" << comp_name
+                        << std::endl;
+                    } else if (directive == ".ctrl") {
+                        int id;
+                        std::string param;
+                        double min, max;
+                        iss >> id >> param >> min >> max;
+                        ctrl_params[id] = {param, min, max};
+                        std::cout << "   Directive Ctrl id=" << id
+                        << " param=" << param <<
+                        " min=" << min <<
+                        " max=" << max <<
+                        std::endl;
                     } else if (directive == ".param") {
                         std::string p_name;
                         double p_val;
@@ -463,7 +486,7 @@ public:
                 if (comp->name == comp_name) {
                     auto* pot = dynamic_cast<Potentiometer*>(comp.get());
                     if (!pot)
-                        throw std::runtime_error(".pot refers to non-potentiometer: " + comp_name);
+                        throw std::runtime_error(".knob refers to non-potentiometer: " + comp_name);
                     param_map[id] = pot;
                     found = true;
                     std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
@@ -471,7 +494,7 @@ public:
                 }
             }
             if (!found)
-                throw std::runtime_error(".pot component not found: " + comp_name);
+                throw std::runtime_error(".knob component not found: " + comp_name);
         }
         std::cout << std::endl;
         
@@ -540,6 +563,29 @@ public:
         return it->second->getPosition();
     }
 
+    std::vector<int> getCtrlParameterIds() const {
+        std::vector<int> ids;
+        ids.reserve(ctrl_params.size());
+        for (auto const& [id, param] : ctrl_params) {
+            keys.push_back(id);
+        }
+    }
+    
+    double getCtrlParamValue(int id, double normalizedInput) const {
+        auto it = ctrl_params.find(id);
+        if (it == ctrl_params.end()) {
+            throw std::out_of_range("ID parametro non trovato");
+        }
+
+        const auto& param = it->second;
+        
+        // Assicuriamoci che l'input sia nel range [0, 1]
+        normalizedInput = std::clamp(normalizedInput, 0.0, 1.0);
+
+        // Formula di riscalamento (Linear Interpolation)
+        return param.min + (normalizedInput * (param.max - param.min));
+    }
+    
     void reset() {
         for (auto& comp : components) {
             comp->reset();

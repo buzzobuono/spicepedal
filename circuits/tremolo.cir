@@ -1,6 +1,6 @@
 * Tremolo
 
-A_LFO EVAL modulation="(depth * sin(2 * 3.14 * speed * t))"
+A_LFO modulation="(depth * sin(2 * 3.14 * speed * t))"
 B_GAIN 2 0 V="V(1) * (1 + modulation)" Rs=1
 
 .param speed 8
@@ -8,4 +8,6 @@ B_GAIN 2 0 V="V(1) * (1 + modulation)" Rs=1
 .param modulation 0
 .input 1
 .output 2
-.probe tremolo.csv V(1) V(2)
+.probe V(1) V(2)
+.ctrl 0 depth 0.0 1.0
+.ctrl 1 speed 1.0 16.0
