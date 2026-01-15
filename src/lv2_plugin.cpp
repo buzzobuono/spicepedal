@@ -88,19 +88,19 @@ static LV2_Handle instantiate(
 }
 
 static void set_param_values(SpicePedalPlugin* plugin) {
-    std::vector<int> ids = plugin->circuit->getParameterIds();
+    std::vector<int> ids = plugin->circuit->getCtrlParameterIds();
     for (int id : ids) {
         if (id == 0) {
-            plugin->circuit->setParamValue(id, static_cast<double>(*plugin->param0));
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param0));
         }
         if (id == 1) {
-            plugin->circuit->setParamValue(id, static_cast<double>(*plugin->param1));
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param1));
         }
         if (id == 2) {
-            plugin->circuit->setParamValue(id, static_cast<double>(*plugin->param2));
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param2));
         }
         if (id == 3) {
-            plugin->circuit->setParamValue(id, static_cast<double>(*plugin->param3));
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param3));
         }
     }
 }

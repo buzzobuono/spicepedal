@@ -16,10 +16,8 @@ public:
 
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
         if (!is_initialized) init_exprtk(V);
-        
         sync_variables(V, dt);
         double value = expression.value();
-
         if (params) {
             *params->getPtr(target_param) = value;
         }

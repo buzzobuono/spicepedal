@@ -90,13 +90,13 @@ public:
     }
 
     void initializeParameters() {
-        std::vector<int> ids = circuit.getParameterIds();
+        std::vector<int> ids = circuit.getCtrlParameterIds();
         if (ids.empty()) {
             std::cout << "   No parameter defined" << std::endl;
             return;
         }
         for (int id : ids) {
-            float defaultValue = circuit.getParamValue(id);
+            float defaultValue = circuit.getCtrlParamValue(id);
             paramIds[id].store(defaultValue);
             std::cout << "   " << id << " = " << paramIds[id].load() << std::endl;
         }
@@ -122,14 +122,14 @@ public:
                         case 'A':  // ↑
                             value = std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
                             paramIds[currentParamIndex].store(value);
-                            circuit.setParamValue(currentParamIndex, value);
+                            circuit.setCtrlParamValue(currentParamIndex, value);
                             std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 
                         case 'B':  // ↓
                             value = std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
                             paramIds[currentParamIndex].store(value);
-                            circuit.setParamValue(currentParamIndex, value);
+                            circuit.setCtrlParamValue(currentParamIndex, value);
                             std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 

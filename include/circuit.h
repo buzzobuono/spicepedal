@@ -59,8 +59,6 @@ public:
     int output_node;
     double warmup_duration = 0;
     std::map<std::string, double> initial_conditions;
-    std::vector<std::pair<int, std::string>> pending_params;
-    std::map<int, Potentiometer*> param_map;
     std::map<int, CtrlParam> ctrl_params;
     std::vector<ProbeTarget> probes;
     std::string probe_file;
@@ -243,7 +241,7 @@ public:
                     double v = parseNumericValue(value);
                     std::string attributes;
                     std::getline(iss, attributes);
-                    std::string taper_str = parseAttributeValue(attributes, "Taper", "LIN");
+                    std::string taper_str = parseAttributeValue(attributes, "taper", "LIN");
                     Potentiometer::TaperType taper;
                     if (taper_str == "LOG" || taper_str == "A")
                         taper = Potentiometer::TaperType::LOGARITHMIC;
@@ -251,16 +249,18 @@ public:
                         taper = Potentiometer::TaperType::LINEAR;
                     else
                         throw std::runtime_error("Potentiometer taper not recognized:" + taper_str);
-                    double pos = parseNumericValue(parseAttributeValue(attributes, "Pos", "0.5"));
-                    components.push_back(std::make_unique<Potentiometer>(comp_name, n1, n2, nw, v, pos, taper));
+                    std::string param = parseAttributeValue(attributes, "param", "");
+                    auto pot = std::make_unique<Potentiometer>(comp_name, n1, n2, nw, v, taper, param);
                     std::cout << "   Component Potentiometer name=" << comp_name
                     << " n1=" << n1
                     << " n2=" << n2
                     << " nw=" << nw
                     << " v=" << value
-                    << " Taper=" << taper_str
-                    << " Pos=" << pos
+                    << " taper=" << taper_str
+                    << " param=" << param
                     << std::endl;
+                    pot->setParams(&(this->params));
+                    components.push_back(std::move(pot));
                     max_node = std::max({max_node, n1, n2, nw});
                     break;
                 }
@@ -441,14 +441,6 @@ public:
                         iss >> cap_name >> v0;
                         initial_conditions[cap_name] = v0;
                         std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
-                    } else if (directive == ".knob") {
-                        int id;
-                        std::string comp_name;
-                        iss >> id >> comp_name;
-                        pending_params.push_back({id, comp_name});
-                        std::cout << "   Directive Knob id=" << id <<
-                        " comp=" << comp_name
-                        << std::endl;
                     } else if (directive == ".ctrl") {
                         int id;
                         std::string param;
@@ -478,25 +470,6 @@ public:
         std::cout << std::endl;
         
         num_nodes = max_node + 1;
-        
-        std::cout << "Linked Params"<< std::endl;
-        for (auto& [id, comp_name] : pending_params) {
-            bool found = false;
-            for (auto& comp : components) {
-                if (comp->name == comp_name) {
-                    auto* pot = dynamic_cast<Potentiometer*>(comp.get());
-                    if (!pot)
-                        throw std::runtime_error(".knob refers to non-potentiometer: " + comp_name);
-                    param_map[id] = pot;
-                    found = true;
-                    std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
-                    break;
-                }
-            }
-            if (!found)
-                throw std::runtime_error(".knob component not found: " + comp_name);
-        }
-        std::cout << std::endl;
         
         return output_node >= 0;
     }
@@ -538,54 +511,36 @@ public:
         std::cout << std::endl;
     }
 
-    std::vector<int> getParameterIds() const {
-        std::vector<int> ids;
-        ids.reserve(param_map.size());
-        for (const auto& [id, pot] : param_map) {
-            ids.push_back(id);
-        }
-        std::sort(ids.begin(), ids.end());
-        return ids;
-    }
-
-    void setParamValue(int id, double value) {
-        auto it = param_map.find(id);
-        if (it == param_map.end())
-            throw std::runtime_error("Parameter ID not found: " + std::to_string(id));
-        it->second->setPosition(value);
-    }
-
-    double getParamValue(int id) {
-        auto it = param_map.find(id);
-        if (it == param_map.end())
-            throw std::runtime_error("Parameter ID not found: " + std::to_string(id));
-        
-        return it->second->getPosition();
-    }
-
     std::vector<int> getCtrlParameterIds() const {
         std::vector<int> ids;
         ids.reserve(ctrl_params.size());
         for (auto const& [id, param] : ctrl_params) {
-            keys.push_back(id);
+            ids.push_back(id);
         }
+        return ids;
     }
     
-    double getCtrlParamValue(int id, double normalizedInput) const {
+    double getCtrlParamValue(int id) const {
+        auto it = ctrl_params.find(id);
+        if (it == ctrl_params.end()) return 0.0;
+        const auto& param = it->second;
+        double actualValue = params.get(param.name);
+        if (param.max <= param.min) return 0.0;
+        double normalized = (actualValue - param.min) / (param.max - param.min);
+        return std::clamp(normalized, 0.0, 1.0);
+    }
+
+    void setCtrlParamValue(int id, double value) {
         auto it = ctrl_params.find(id);
         if (it == ctrl_params.end()) {
-            throw std::out_of_range("ID parametro non trovato");
+            throw std::runtime_error("Param id cannot be determined: " + std::string(1, id));
         }
-
         const auto& param = it->second;
-        
-        // Assicuriamoci che l'input sia nel range [0, 1]
-        normalizedInput = std::clamp(normalizedInput, 0.0, 1.0);
-
-        // Formula di riscalamento (Linear Interpolation)
-        return param.min + (normalizedInput * (param.max - param.min));
+        value = std::clamp(value, 0.0, 1.0);
+        double actualValue = param.min + (value * (param.max - param.min));
+        params.set(param.name, actualValue);
     }
-    
+
     void reset() {
         for (auto& comp : components) {
             comp->reset();
