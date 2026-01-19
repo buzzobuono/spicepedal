@@ -114,7 +114,7 @@ public:
         std::vector<double> signalIn;
             
         if (!input_file.empty()) {
-            signal_generator = std::make_unique<FileInputGenerator>(input_file, input_amplitude);
+            signal_generator = std::make_unique<FileInputGenerator>(sample_rate, input_file, input_amplitude);
         } else if (frequency_sweep_log) {
             signal_generator = std::make_unique<LogarithmicFrequencySweepGenerator>(sample_rate, input_duration, input_amplitude);
         } else if (frequency_sweep_lin) {

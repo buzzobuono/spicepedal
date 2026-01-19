@@ -10,20 +10,26 @@ Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 
 * Pinch pot
 R2 3 4 100k
-Ppinch 4 5 8 500k Pos=0.5 Taper=LIN
+Ppinch 4 5 8 500k param=pinch taper=LIN
 W1 8 5
 
 * Wool pot
-C6 5 6 100e-6
+C6 5 6 100u
 R1 8 0 2.2k
-Pwool 6 10 0 2k Pos=0.5 Taper=LIN
+Pwool 6 10 0 2k param=wool taper=LIN
 
-C1 7 3 0.22e-6
-C2 3 0 10e-9
+Bgain 10 0 V="gain*V(2)" Rs=1
+
+C1 7 3 0.22u
+C2 3 0 10n
 
 .input 7
-.output 2
+.output 10
 .warmup 60
-.ctrl 0 Ppinch
-.ctrl 1 Pwool
-.probe wolly-mammoth.csv V(7) V(2)
+.ctrl 0 pinch 0.0 1.0
+.ctrl 1 wool 0.0 1.0
+.ctrl 2 gain 0.0 5.0
+.param pinch 0.9
+.param wool 0.1
+.param gain 1
+*.probe V(7) V(2)

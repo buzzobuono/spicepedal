@@ -40,8 +40,8 @@ class TransientSolver : public NewtonRaphsonSolver {
           bypass(bypass),
           output_file(output_file)
     {
-        this->signal_generator->printInfo();
         signalIn = this->signal_generator->generate();
+        this->signal_generator->printInfo();
     }
     
     ~TransientSolver() override {

@@ -10,9 +10,10 @@
 #include <fcntl.h>
 #include <mutex>
 #include <chrono>
-
 #include <sndfile.h>
 #include <portaudio.h>
+#include <samplerate.h>
+
 #include "external/CLI11.hpp"
 
 #include "circuit.h"
@@ -91,14 +92,9 @@ public:
 
     void initializeParameters() {
         std::vector<int> ids = circuit.getCtrlParameterIds();
-        if (ids.empty()) {
-            std::cout << "   No parameter defined" << std::endl;
-            return;
-        }
         for (int id : ids) {
             float defaultValue = circuit.getCtrlParamValue(id);
             paramIds[id].store(defaultValue);
-            std::cout << "   " << id << " = " << paramIds[id].load() << std::endl;
         }
     }
 
@@ -123,24 +119,20 @@ public:
                             value = std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
                             paramIds[currentParamIndex].store(value);
                             circuit.setCtrlParamValue(currentParamIndex, value);
-                            std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 
                         case 'B':  // ↓
                             value = std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
                             paramIds[currentParamIndex].store(value);
                             circuit.setCtrlParamValue(currentParamIndex, value);
-                            std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 
                         case 'D':  // ←
                             currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
-                            std::cout << "Current param index " << currentParamIndex << std::endl;
                         break;
 
                         case 'C':  // →
                             currentParamIndex = (currentParamIndex + 1) % paramIds.size();
-                            std::cout << "Current param index " << currentParamIndex << std::endl;
                         break;
                     }
 
@@ -164,7 +156,240 @@ public:
         std::cout << std::endl;
     }
 
+    bool processAndPlay_try2(const std::string& input_file) {
+        using clock = std::chrono::high_resolution_clock;
+        double worstBufferLatencyMs = 0.0;
+        auto lastReportTime = clock::now();
+        
+        SF_INFO sfinfo;
+        std::memset(&sfinfo, 0, sizeof(sfinfo));
+        SNDFILE* infile = sf_open(input_file.c_str(), SFM_READ, &sfinfo);
+        if (!infile) return false;
+        
+        double hardware_sr = 44100.0;
+        double solver_step_ratio = hardware_sr / sample_rate;
+        double accumulator = 0.0;
+        float last_vout = 0.0f;
+        
+        Pa_Initialize();
+        PaStream* stream;
+        Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, hardware_sr, buffer_size, nullptr, nullptr);
+        Pa_StartStream(stream);
+        
+        std::vector<float> buffer(buffer_size * sfinfo.channels);
+        solver->initialize();
+        
+        bool running = true;
+        setNonBlocking(true);
+        printControls();
+        
+        std::thread inputThread([&]() {
+            while (running) {
+                running = handleKeyPress();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        });
+        
+        while (running) {
+            sf_count_t readcount = sf_readf_float(infile, buffer.data(), buffer_size);
+            if (readcount == 0) {
+                sf_seek(infile, 0, SEEK_SET);
+                continue;
+            }
+            
+            auto bufferStart = clock::now();
+            
+            for (size_t frame = 0; frame < (size_t)readcount; ++frame) {
+                size_t idx = frame * sfinfo.channels;
+                
+                accumulator += 1.0;
+                if (accumulator >= solver_step_ratio) {
+                    float vin = buffer[idx] * input_gain;
+                    solver->setInputVoltage(vin);
+                    if (solver->solve()) {
+                        last_vout = solver->getOutputVoltage();
+                    }
+                    last_vout = std::isfinite(last_vout) ? last_vout : 0.0f;
+                    accumulator -= solver_step_ratio;
+                }
+                
+                for (int ch = 0; ch < sfinfo.channels; ++ch) {
+                    buffer[idx + ch] = last_vout;
+                }
+            }
+            
+            auto bufferEnd = clock::now();
+            double bufferTimeMs = std::chrono::duration<double, std::milli>(bufferEnd - bufferStart).count();
+            
+            auto now = clock::now();
+            if (std::chrono::duration<double, std::milli>(now - lastReportTime).count() > 1000.0) {
+                std::cout << "Compute: " << bufferTimeMs << " ms | Solver SR: " << sample_rate << " Hz | Hardware SR: " << hardware_sr << " Hz" << std::endl;
+                lastReportTime = now;
+            }
+            
+            Pa_WriteStream(stream, buffer.data(), readcount);
+        }
+        
+        running = false;
+        if (inputThread.joinable()) inputThread.join();
+        setNonBlocking(false);
+        Pa_StopStream(stream);
+        Pa_CloseStream(stream);
+        Pa_Terminate();
+        sf_close(infile);
+        return true;
+    }
+
+    bool processAndPlay_try(const std::string& input_file) {
+        using clock = std::chrono::high_resolution_clock;
+        double worstBufferLatencyMs = 0.0;
+        auto lastReportTime = clock::now();
+
+        SF_INFO sfinfo;
+        std::memset(&sfinfo, 0, sizeof(sfinfo));
+
+        SNDFILE* infile = sf_open(input_file.c_str(), SFM_READ, &sfinfo);
+        if (!infile) {
+            std::cerr << "Errore apertura file di input: " << sf_strerror(nullptr) << "\n";
+            return false;
+        }
+
+        double resampleRatio = sample_rate / static_cast<double>(sfinfo.samplerate);
+        bool needResampling = (std::abs(sfinfo.samplerate - sample_rate) > 0.1);
+
+        PaError err = Pa_Initialize();
+        if (err != paNoError) {
+            std::cerr << "Errore PortAudio: " << Pa_GetErrorText(err) << "\n";
+            sf_close(infile);
+            return false;
+        }
+        
+        PaStream* stream;
+        err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, 
+                                   sample_rate, buffer_size, nullptr, nullptr);
+        if (err != paNoError) { 
+            Pa_Terminate(); 
+            sf_close(infile); 
+            return false; 
+        }
+        Pa_StartStream(stream);
+
+        std::vector<float> readBuffer(buffer_size * sfinfo.channels);
+        std::vector<float> processingBuffer;
+
+        solver->initialize();
+        
+        bool running = true;
+        setNonBlocking(true);
+        
+        printControls();
+        
+        std::thread inputThread([&]() {
+            while (running) {
+                running = handleKeyPress();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        });
+
+        sf_count_t readcount;
+        while (running) {
+            readcount = sf_readf_float(infile, readBuffer.data(), buffer_size);
+
+            if (readcount == 0) {
+                sf_seek(infile, 0, SEEK_SET);
+                continue;
+            }
+
+            auto bufferStart = clock::now();
+
+            float* currentDataPtr;
+            long framesToProcess;
+
+            if (needResampling) {
+                long max_out_frames = static_cast<long>(readcount * resampleRatio) + 2;
+                processingBuffer.resize(max_out_frames * sfinfo.channels);
+
+                SRC_DATA src_data;
+                src_data.data_in = readBuffer.data();
+                src_data.data_out = processingBuffer.data();
+                src_data.input_frames = readcount;
+                src_data.output_frames = max_out_frames;
+                src_data.src_ratio = resampleRatio;
+
+                int src_err = src_simple(&src_data, SRC_SINC_FASTEST, sfinfo.channels);
+                if (src_err) {
+                    std::cerr << "Resampling error: " << src_strerror(src_err) << "\n";
+                    break;
+                }
+                
+                framesToProcess = src_data.output_frames_gen;
+                currentDataPtr = processingBuffer.data();
+            } else {
+                framesToProcess = readcount;
+                currentDataPtr = readBuffer.data();
+            }
+
+            for (size_t frame = 0; frame < static_cast<size_t>(framesToProcess); ++frame) {
+                size_t baseIdx = frame * sfinfo.channels;
+                float vin = currentDataPtr[baseIdx] * input_gain;
+                float vout = 0.0f;
+                
+                solver->setInputVoltage(vin);
+                if (solver->solve()) {
+                    vout = solver->getOutputVoltage();
+                }
+                
+                vout = std::isfinite(vout) ? vout : 0.0f;
+                for (int ch = 0; ch < sfinfo.channels; ++ch) {
+                    currentDataPtr[baseIdx + ch] = vout;
+                }
+            }
+
+            auto bufferEnd = clock::now();
+            double bufferTimeMs = std::chrono::duration<double, std::milli>(bufferEnd - bufferStart).count();
+            double bufferDurationMs = (static_cast<double>(framesToProcess) / sample_rate) * 1000.0;
+            double perceivedLatencyMs = bufferTimeMs + bufferDurationMs;
+
+            if (perceivedLatencyMs > worstBufferLatencyMs)
+                worstBufferLatencyMs = perceivedLatencyMs;
+                
+            auto now = clock::now();
+            double elapsedMs = std::chrono::duration<double, std::milli>(now - lastReportTime).count();
+
+            if (elapsedMs > 1000.0) {
+                std::cout << "BufTime: " << bufferTimeMs << " ms | "
+                          << "Latency: " << perceivedLatencyMs << " ms | "
+                          << "Worst: " << worstBufferLatencyMs << " ms       " 
+                          << std::endl << std::flush;
+                lastReportTime = now;
+            }
+
+            err = Pa_WriteStream(stream, currentDataPtr, framesToProcess);
+            if (err != paNoError) {
+                std::cerr << "\nErrore Pa_WriteStream: " << Pa_GetErrorText(err) << "\n";
+                break;
+            }
+        }
+
+        running = false;
+        if (inputThread.joinable()) inputThread.join();
+        setNonBlocking(false);
+
+        Pa_StopStream(stream);
+        Pa_CloseStream(stream);
+        Pa_Terminate();
+        sf_close(infile);
+
+        std::cout << "\n✓ Riproduzione terminata\n";
+        return true;
+    }
+
     bool processAndPlay(const std::string& input_file) {
+        double hardware_sr = 44100.0; // O una costante standard
+        double solver_step_ratio = hardware_sr / sample_rate;
+        double accumulator = 0.0;
+        float last_vout = 0.0f;
+
         using clock = std::chrono::high_resolution_clock;
         double worstBufferLatencyMs = 0.0;
         
@@ -188,7 +413,7 @@ public:
         
         PaStream* stream;
         err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, 
-                                   sfinfo.samplerate, buffer_size, nullptr, nullptr);
+                                   hardware_sr, buffer_size, nullptr, nullptr);
         if (err != paNoError) { 
             Pa_Terminate(); 
             sf_close(infile); 
@@ -212,7 +437,6 @@ public:
             }
         });
 
-
         sf_count_t readcount;
         while (running) {
             readcount = sf_readf_float(infile, buffer.data(), buffer_size);
@@ -227,51 +451,29 @@ public:
             // OTTIMIZZAZIONE: processa per frame invece che per campione
             size_t numSamples = readcount * sfinfo.channels;
             
-            if (sfinfo.channels == 1) {
-                // Mono: processa direttamente
-                for (size_t i = 0; i < numSamples; ++i) {
-                    float vin = buffer[i] * input_gain;
-                    float vout = 0.0f;
-                    solver->setInputVoltage(vin);
-                    if (solver->solve()) {
-                        vout = solver->getOutputVoltage();
-                    }
-                    buffer[i] = std::isfinite(vout) ? vout : 0.0f;
-                }
-            } else if (sfinfo.channels == 2) {
-                // Stereo: processa solo canale sinistro e copia a destra
-                for (size_t frame = 0; frame < static_cast<size_t>(readcount); ++frame) {
-                    size_t idx = frame * 2;
-                    float vin = buffer[idx] * input_gain;
-                    float vout = 0.0f;
-                    solver->setInputVoltage(vin);
-                    if (solver->solve()) {
-                        vout = solver->getOutputVoltage();
-                    }
-                    vout = std::isfinite(vout) ? vout : 0.0f;
-                    buffer[idx] = vout;      // Left
-                    buffer[idx + 1] = vout;  // Right (copia)
-                }
-            } else {
-                // Multi-canale: processa primo canale e replica
-                for (size_t frame = 0; frame < static_cast<size_t>(readcount); ++frame) {
-                    size_t baseIdx = frame * sfinfo.channels;
+            // Logica universale: processa il primo canale di ogni frame e replica su tutti gli altri
+            for (size_t frame = 0; frame < static_cast<size_t>(readcount); ++frame) {
+                size_t baseIdx = frame * sfinfo.channels;
+                accumulator += 1.0;
+                if (accumulator >= solver_step_ratio) {
                     float vin = buffer[baseIdx] * input_gain;
-                    float vout = 0.0f;
                     solver->setInputVoltage(vin);
+                    
                     if (solver->solve()) {
-                        vout = solver->getOutputVoltage();
+                        last_vout = solver->getOutputVoltage();
                     }
-                    vout = std::isfinite(vout) ? vout : 0.0f;
-                    for (int ch = 0; ch < sfinfo.channels; ++ch) {
-                        buffer[baseIdx + ch] = vout;
-                    }
+                    last_vout = std::isfinite(last_vout) ? last_vout : 0.0f;
+                    accumulator -= solver_step_ratio;
+                }
+                // Replica last_vout su tutti i canali del frame (1 se mono, 2 se stereo, ecc.)
+                for (int ch = 0; ch < sfinfo.channels; ++ch) {
+                    buffer[baseIdx + ch] = last_vout;
                 }
             }
-
+            
             auto bufferEnd = clock::now();
             double bufferTimeMs = std::chrono::duration<double, std::milli>(bufferEnd - bufferStart).count();
-            double bufferDurationMs = (static_cast<double>(readcount) / sfinfo.samplerate) * 1000.0;
+            double bufferDurationMs = (static_cast<double>(readcount) / hardware_sr) * 1000.0;
             double perceivedLatencyMs = bufferTimeMs + bufferDurationMs;
 
             if (perceivedLatencyMs > worstBufferLatencyMs)
@@ -320,6 +522,7 @@ int main(int argc, char* argv[]) {
     std::string netlist_file;
     double input_gain = 1.0;
     int source_impedance = 25000;
+    int sample_rate = 44100;
     int max_iterations;
     double tolerance;
     int buffer_size = 128;
@@ -332,6 +535,7 @@ int main(int argc, char* argv[]) {
     app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")
         ->check(CLI::Range(0, 30000))
         ->default_val(25000);
+    app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     app.add_option("-g,--input-gain", input_gain, "Input Gain")
         ->check(CLI::Range(0.0, 5.0))
         ->default_val(1.0);
@@ -346,7 +550,7 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app, argc, argv);
     
     try {
-        SF_INFO sf_info;
+        /*SF_INFO sf_info;
         std::memset(&sf_info, 0, sizeof(sf_info));
         SNDFILE* tmp = sf_open(input_file.c_str(), SFM_READ, &sf_info);
         if (!tmp) {
@@ -355,7 +559,8 @@ int main(int argc, char* argv[]) {
         }
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
-
+        */
+        
         SpicePedalStreamingProcessor processor(netlist_file, sample_rate, input_gain, source_impedance, max_iterations, tolerance, buffer_size);
         if (!processor.processAndPlay(input_file))
             return 1;

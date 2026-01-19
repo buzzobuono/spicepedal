@@ -10,7 +10,7 @@ Q1 2 3 0 2N5088
 C1 5 3 4.7u
 R2 4 0 100M
 
-*Pvol0 4 0 7 100k param=volume taper=LOG
+Pvol0 4 0 7 100k param=volume taper=LOG
 
 .input 5
 .output 7

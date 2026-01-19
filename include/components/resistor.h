@@ -9,6 +9,7 @@
 
 class Resistor : public Component {
 private:
+    
     double _r;
 
     // Variabili per salvare tensioni nodali al passo corrente
@@ -27,8 +28,7 @@ public:
     }
     
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-        const double R_MIN = 1e-12;
-        const double R_MAX = 1e12;
+        
         if (_r > R_MAX) return;
 
         double g = 1.0 / std::max(_r, R_MIN);

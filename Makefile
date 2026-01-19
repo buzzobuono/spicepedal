@@ -6,7 +6,7 @@ else
     CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only #-Wall -Wextra -fsanitize=address 
     INCLUDES = -I/usr/include/eigen3 -Iinclude
 endif
-LIBS_SNDFILE = -lsndfile
+LIBS_SNDFILE = -lsndfile -lsamplerate
 LIBS_PORTAUDIO = -lportaudio
 LIBS_FFTW3 = -lfftw3
 LV2_CXXFLAGS = -fPIC -shared

@@ -24,7 +24,8 @@ enum class ComponentType {
 class Component {
     
     protected:
-    
+    const double R_MIN = 1e-12;
+    const double R_MAX = 1e12;
     ParameterRegistry* params = nullptr;
 
     public:

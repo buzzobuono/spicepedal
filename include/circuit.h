@@ -234,7 +234,7 @@ public:
                     break;
                 }
                 case 'P': {
-                    // P1 1 2 3 10k Pos=0.5 Taper=LOG
+                    // P1 1 2 3 10k param=volume taper=LOG
                     int n1, n2, nw;
                     std::string value;
                     iss >> n1 >> n2 >> nw >> value;
@@ -522,23 +522,19 @@ public:
     
     double getCtrlParamValue(int id) const {
         auto it = ctrl_params.find(id);
-        if (it == ctrl_params.end()) return 0.0;
         const auto& param = it->second;
         double actualValue = params.get(param.name);
-        if (param.max <= param.min) return 0.0;
         double normalized = (actualValue - param.min) / (param.max - param.min);
         return std::clamp(normalized, 0.0, 1.0);
     }
 
     void setCtrlParamValue(int id, double value) {
         auto it = ctrl_params.find(id);
-        if (it == ctrl_params.end()) {
-            throw std::runtime_error("Param id cannot be determined: " + std::string(1, id));
-        }
         const auto& param = it->second;
         value = std::clamp(value, 0.0, 1.0);
         double actualValue = param.min + (value * (param.max - param.min));
         params.set(param.name, actualValue);
+        std::cout << "   Parameter " << param.name << " set to " << actualValue << std::endl;
     }
 
     void reset() {
