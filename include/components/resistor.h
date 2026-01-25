@@ -12,10 +12,6 @@ private:
     
     double _r;
 
-    // Variabili per salvare tensioni nodali al passo corrente
-    double V1_prev = 0.0;
-    double V2_prev = 0.0;
-
 public:
     Resistor(const std::string& comp_name, int n1, int n2, double r) {
         if (r <= 0) throw std::runtime_error("Resistance must be positive");
@@ -42,19 +38,17 @@ public:
             G(n2, n2) += g;
             if (n1 != 0) G(n2, n1) -= g;
         }
-
-        // Salva le tensioni nodali per getCurrent
-        V1_prev = (n1 != 0) ? V(n1) : 0.0;
-        V2_prev = (n2 != 0) ? V(n2) : 0.0;
+        
     }
-
-    double getCurrent() const override {
-        return (V1_prev - V2_prev) / _r;
+    
+    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+        (void)dt; // dt non è usato per il calcolo statico del resistore
+        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
+        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        // Legge di Ohm: I = V/R
+        return (v1 - v2) / std::max(_r, R_MIN);
     }
-
-    double getResistance() const { 
-        return _r; 
-    }
+    
 };
 
 #endif

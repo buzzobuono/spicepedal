@@ -26,6 +26,8 @@ class Component {
     protected:
     const double R_MIN = 1e-12;
     const double R_MAX = 1e12;
+    const double G_MIN_STABILITY = 1e-12;
+   
     ParameterRegistry* params = nullptr;
 
     public:
@@ -45,9 +47,9 @@ class Component {
     
     virtual void updateHistory(const Eigen::VectorXd& V, double dt) {}
     
-    virtual void reset() {}
+    virtual double getCurrent(const Eigen::VectorXd& V, double dt) const { return 0.0; };
     
-    virtual double getCurrent() const { return 0.0; }
+    virtual void reset() {}
     
 };
 

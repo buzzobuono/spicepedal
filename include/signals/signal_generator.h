@@ -10,7 +10,7 @@ class SignalGenerator {
     
     virtual ~SignalGenerator() = default;
     
-    virtual std::vector<double> generate() = 0;
+    virtual std::vector<double> generate(double input_gain) = 0;
     
     virtual double getScaleFactor() const { return 1.0; }
     

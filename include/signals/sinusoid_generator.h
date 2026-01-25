@@ -19,13 +19,13 @@ class SinusoidGenerator : public SignalGenerator {
     SinusoidGenerator(double sample_rate, int input_frequency, double input_duration, double input_amplitude)
         : sample_rate(sample_rate), input_frequency(input_frequency), input_duration(input_duration), input_amplitude(input_amplitude) {}
 
-    std::vector<double> generate() override {
+    std::vector<double> generate(double input_gain) override {
         size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
         std::vector<double> signalIn(total_samples, 0.0);
 
         for (size_t i = 0; i < total_samples; ++i) {
             double t = i / sample_rate;
-            signalIn[i] = input_amplitude * std::sin(2.0 * M_PI * input_frequency * t);
+            signalIn[i] = input_gain * input_amplitude * std::sin(2.0 * M_PI * input_frequency * t);
         }
         
         return signalIn;

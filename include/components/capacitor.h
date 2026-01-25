@@ -30,12 +30,10 @@ public:
     }
 
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-        
         if (dt <= 0.0) {
             // Caso DC: condensatore aperto
             return;
         }
-        
         // Trapezoidal rule
         double geq = 2.0 * C / dt;          // equivalente conductance
         double ieq = geq * v_prev + i_prev; // corrente equivalente
@@ -69,6 +67,23 @@ public:
         i_prev = 0.0; // Assumendo che parta da regime
     }
 
+    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+        if (dt <= 0.0) {
+            return 0.0; // In DC il condensatore è un circuito aperto
+        }
+
+        double v_n1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
+        double v_n2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double v_now = v_n1 - v_n2;
+
+        // Corrente calcolata con la regola del trapezio:
+        // i(n) = (2*C/dt) * (v(n) - v(n-1)) - i(n-1)
+        double geq = 2.0 * C / dt;
+        double current = geq * (v_now - v_prev) - i_prev;
+
+        return current;
+    }
+    
     void reset() override {
         v_prev = 0.0;
         i_prev = 0.0;

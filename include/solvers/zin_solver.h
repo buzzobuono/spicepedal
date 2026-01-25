@@ -26,12 +26,12 @@ class ZInSolver : public NewtonRaphsonSolver {
 
     public:
     
-    ZInSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, sample_rate, source_impedance, max_iterations, tolerance),
+    ZInSolver(Circuit& circuit, double sample_rate, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance)
+        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
           signal_generator(std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude))
     {
         signal_generator->printInfo();
-        signalIn = signal_generator->generate();
+        signalIn = signal_generator->generate(0);
         this->input_voltage = 0.0;
     }
 
@@ -59,22 +59,22 @@ class ZInSolver : public NewtonRaphsonSolver {
             
             this->input_voltage = v_src;
 
-            bool ok = runNewtonRaphson(dt);
-            (void)ok;
-
-            
-            double v_node = 0.0;
-            if (circuit.input_node >= 0 && static_cast<size_t>(circuit.input_node) < static_cast<size_t>(circuit.num_nodes)) {
-                v_node = V(circuit.input_node);
+            if (runNewtonRaphson(dt)) {
+                double v_node = 0.0;
+                if (circuit.input_node >= 0 && static_cast<size_t>(circuit.input_node) < static_cast<size_t>(circuit.num_nodes)) {
+                    v_node = V(circuit.input_node);
+                }
+                double i_inst = (v_src - v_node) * source_g; 
+                
+                double cos_wt = std::cos(omega * t);
+                double sin_wt = std::sin(omega * t);
+                std::complex<double> weight(cos_wt, -sin_wt);
+                
+                V_ph += std::complex<double>(v_src, 0.0) * weight;
+                I_ph += std::complex<double>(i_inst, 0.0) * weight;
+                
+                updateComponentsHistory(dt);
             }
-            double i_inst = (v_src - v_node) * source_g; 
-
-            double cos_wt = std::cos(omega * t);
-            double sin_wt = std::sin(omega * t);
-            std::complex<double> weight(cos_wt, -sin_wt);
-
-            V_ph += std::complex<double>(v_src, 0.0) * weight;
-            I_ph += std::complex<double>(i_inst, 0.0) * weight;
         }
         
         V_ph /= static_cast<double>(num_samples);
@@ -82,12 +82,13 @@ class ZInSolver : public NewtonRaphsonSolver {
         
         const double min_current = 1e-12;
         std::complex<double> Z_in;
+            
         if (std::abs(I_ph) < min_current) {
             Z_in = std::complex<double>(1e12, 0.0);
         } else {
             Z_in = V_ph / I_ph;
         }
-        
+            
         Z_magnitude = std::abs(Z_in);
         Z_phase = std::arg(Z_in) * 180.0 / M_PI;
         

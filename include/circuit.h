@@ -56,6 +56,7 @@ public:
     std::vector<std::unique_ptr<Component>> components;
     int num_nodes;
     int input_node;
+    int source_impedance;
     int output_node;
     double warmup_duration = 0;
     std::map<std::string, double> initial_conditions;
@@ -408,7 +409,10 @@ public:
                     std::string directive = comp_name;
                     if (directive == ".input") {
                         iss >> input_node;
-                        std::cout << "   Directive Input Node: " << input_node << std::endl;
+                        std::string attributes;
+                        std::getline(iss, attributes);
+                        source_impedance = parseNumericValue(parseAttributeValue(attributes, "Zsrc", "15k"));
+                        std::cout << "   Directive Input Node: " << input_node << " Zsrc=" << source_impedance << std::endl;
                     } else if (directive == ".output") {
                         iss >> output_node;
                         std::cout << "   Directive Output Node: " << output_node << std::endl;

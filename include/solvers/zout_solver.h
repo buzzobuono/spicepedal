@@ -40,14 +40,14 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
     public:
     
-    ZOutSolver(Circuit& circuit, double sample_rate, int source_impedance, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
-        : NewtonRaphsonSolver(circuit, sample_rate, source_impedance, max_iterations, tolerance),
+    ZOutSolver(Circuit& circuit, double sample_rate, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
+        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
           signal_generator(std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude)),
             load_g(1.0 / test_load_impedance),
             current_load_g(1.0 / test_load_impedance)
     {
         signal_generator->printInfo();
-        signalIn = signal_generator->generate();
+        signalIn = signal_generator->generate(0);
         this->input_voltage = 0.0;
     }
 
@@ -63,7 +63,6 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
         int num_samples = signalIn.size();
         
-
         double omega = 2.0 * M_PI * signal_generator->getFrequency();
 
         double load_g_backup = load_g;
@@ -72,7 +71,6 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
         std::complex<double> V_open_ph(0.0, 0.0);
         
-
         for (int s = 0; s < num_samples; ++s) {
             double t = s * dt;
             
@@ -80,21 +78,21 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
             this->input_voltage = v_src;
 
-            bool ok = runNewtonRaphson(dt);
-            (void)ok;
-
-            
-            double v_out = 0.0;
-            if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
-                v_out = V(circuit.output_node); 
+            if (runNewtonRaphson(dt)) {
+                double v_out = 0.0;
+                if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
+                    v_out = V(circuit.output_node);
+                }
+                
+                double cos_wt = std::cos(omega * t);
+                double sin_wt = std::sin(omega * t);
+                
+                std::complex<double> weight(cos_wt, -sin_wt);
+                
+                V_open_ph += std::complex<double>(v_out, 0.0) * weight;
+                
+                updateComponentsHistory(dt);
             }
-
-            double cos_wt = std::cos(omega * t);
-            double sin_wt = std::sin(omega * t);
-            std::complex<double> weight(cos_wt, -sin_wt);
-
-            V_open_ph += std::complex<double>(v_out, 0.0) * weight;
-           
         }
 
         V_open_ph /= static_cast<double>(num_samples);
@@ -105,7 +103,9 @@ class ZOutSolver : public NewtonRaphsonSolver {
         std::complex<double> I_loaded_ph(0.0, 0.0);
 
         initialize();
-
+        
+        warmUp(5.0);
+        
         for (int s = 0; s < num_samples; ++s) {
             double t = s * dt;
             
@@ -113,23 +113,24 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
             this->input_voltage = v_src;
             
-            runNewtonRaphson(dt);
-
+            if (runNewtonRaphson(dt)) {
+                
+                double v_out = 0.0;
+                if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
+                    v_out = V(circuit.output_node);
+                }
             
-            double v_out = 0.0;
-            if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
-                v_out = V(circuit.output_node);
+                double i_load = v_out * current_load_g;
+
+                double cos_wt = std::cos(omega * t);
+                double sin_wt = std::sin(omega * t);
+                std::complex<double> weight(cos_wt, -sin_wt);
+                
+                V_loaded_ph += std::complex<double>(v_out, 0.0) * weight;
+                I_loaded_ph += std::complex<double>(i_load, 0.0) * weight;
+                
+                updateComponentsHistory(dt);
             }
-            
-            double i_load = v_out * current_load_g;
-
-            double cos_wt = std::cos(omega * t);
-            double sin_wt = std::sin(omega * t);
-            std::complex<double> weight(cos_wt, -sin_wt);
-
-            V_loaded_ph += std::complex<double>(v_out, 0.0) * weight;
-            I_loaded_ph += std::complex<double>(i_load, 0.0) * weight;
-        
         }
 
         V_loaded_ph /= static_cast<double>(num_samples);

@@ -28,13 +28,13 @@ public:
           t_delay(t_delay), t_rise(t_rise), t_fall(t_fall),
           t_pulse_width(t_pulse_width), t_period(t_period) {}
 
-    std::vector<double> generate() override {
+    std::vector<double> generate(double input_gain) override {
         size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
         std::vector<double> signalIn(total_samples, v_initial);
 
         for (size_t i = 0; i < total_samples; ++i) {
             double t = i / sample_rate;
-            signalIn[i] = calculatePulseValue(t);
+            signalIn[i] = input_gain * calculatePulseValue(t);
         }
         
         return signalIn;

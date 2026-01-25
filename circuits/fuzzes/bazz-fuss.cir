@@ -12,13 +12,18 @@ R2 4 0 100M
 
 Pvol0 4 0 7 100k param=volume taper=LOG
 
+Bgain 8 0 V="og*V(7)"
+
 .input 5
-.output 7
+.output 8
 .include circuits/models/diodes.lib
 .include circuits/models/transistors.lib
-.probe V(5) V(7)
+*.probe V(5) V(7)
+*.probe I(R1) I(C1) I(Q1) I(D1)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2
-.param volume 0.5
+.param volume 0.95
+.param og 2
 .ctrl 0 volume 0.0 1.0
+.ctrl 0 og 0.0 1.0

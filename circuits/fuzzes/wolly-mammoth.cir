@@ -3,7 +3,6 @@
 VCC 9 0 DC 9
 
 * two stage amplifier
-
 R3 9 1 51k
 R4 9 2 20k
 Q1 1 3 0 Q2N3904
@@ -23,6 +22,7 @@ Pwool 6 11 0 2k param=wool taper=LIN
 
 C1 7 3 0.22u
 C2 3 0 10n
+RIn 7 0 10M
 
 * tone stack
 
@@ -38,18 +38,15 @@ C4b 12 0 220n
 Peq 12 10 13 10k param=eq taper=LIN
 Pvol 13 0 14 10k param=volume taper=LIN
 
-
-
-
-.input 7
+.input 7 Zsrc=50k
 .output 14
 .warmup 60
-.param pinch .8
+.param pinch .9
 .param wool .8
 .param eq .8
-.param volume .8
-.ctrl 0 pinch 0 1
-.ctrl 1 wool 0 1
-.ctrl 2 eq 0 1
-.ctrl 3 volume 0 1
+.param volume 1
+.ctrl 0 pinch 0.0 1.0
+.ctrl 1 wool 0.0 1.0
+.ctrl 2 eq 0.0 1.0
+.ctrl 3 volume 0.0 1.0
 *.probe V(14)

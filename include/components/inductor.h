@@ -118,10 +118,31 @@ public:
         v_prev = 0.0;
     }
     
-    // Metodi di accesso per diagnostica
-    double getCurrent() const override { return i_prev; }
-    double getInductance() const { return L; }
-    double getDCResistance() const { return R_dc; }
+    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+        if (dt <= 0.0) {
+            // In DC l'induttore è un corto circuito. 
+            // La corrente dipende dal resto del circuito, ma se c'è R_dc:
+            if (R_dc > 1e-9) {
+                double v1 = (n1 != 0) ? V(n1) : 0.0;
+                double v2 = (n2 != 0) ? V(n2) : 0.0;
+                return (v1 - v2) / R_dc;
+            }
+            return 0.0; // Valore indefinito per R_dc = 0, restituiamo 0 per sicurezza
+        }
+
+        double v1 = (n1 != 0) ? V(n1) : 0.0;
+        double v2 = (n2 != 0) ? V(n2) : 0.0;
+        double v_now = v1 - v2;
+
+        // Integrazione trapezoidale:
+        // i(n) = i(n-1) + (dt / 2L) * [v(n) + v(n-1)]
+        // Nota: Qui ignoriamo R_dc nel calcolo della "i" istantanea 
+        // perché è già implicitamente gestita dal solver NR nel calcolo di v_now
+        double i_now = i_prev + (dt / (2.0 * L)) * (v_now + v_prev);
+
+        return i_now;
+    }
+    
 };
 
 #endif

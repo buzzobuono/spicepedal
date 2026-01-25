@@ -19,12 +19,30 @@ public:
     };
 
 private:
+    
+    const double R_MIN_SAFE = 0.1;
+    
     double _r_total;
     TaperType _taper;
     std::string _param;
 
-    double getTaperedPosition() const
-    {
+    
+    void stampInternalResistor(Eigen::MatrixXd& G, int nA, int nB, double res) {
+        if (nA == nB || res > R_MAX) return;
+
+        double g = 1.0 / std::max(res, R_MIN_SAFE);
+
+        if (nA != 0) {
+            G(nA, nA) += g;
+            if (nB != 0) G(nA, nB) -= g;
+        }
+        if (nB != 0) {
+            G(nB, nB) += g;
+            if (nA != 0) G(nB, nA) -= g;
+        }
+    }
+    
+    double getTaperedPosition() const {
         double pos = params->get(_param);
         
         pos = std::clamp(pos, 0.0, 1.0);
@@ -63,16 +81,18 @@ public:
         if (_r_total > R_MAX) return;
         
         double taperedPos = getTaperedPosition();
-        double r1_val = std::max(_r_total * (1.0 - taperedPos), R_MIN);
-        double r2_val = std::max(_r_total * taperedPos, R_MIN);
+        double r1_val = std::max(_r_total * (1.0 - taperedPos), R_MIN_SAFE);
+        double r2_val = std::max(_r_total * taperedPos, R_MIN_SAFE);
 
         int n1 = nodes[0], n2 = nodes[1], nw = nodes[2];
 
-        Resistor r1(name + "_r1", n1, nw, r1_val);
-        Resistor r2(name + "_r2", n2, nw, r2_val);
-
-        r1.stamp(G, I, V, dt);
-        r2.stamp(G, I, V, dt);
+        stampInternalResistor(G, n1, nw, r1_val);
+        stampInternalResistor(G, n2, nw, r2_val);
+        
+        if (n1 != 0) G(n1, n1) += G_MIN_STABILITY;
+        if (n2 != 0) G(n2, n2) += G_MIN_STABILITY;
+        if (nw != 0) G(nw, nw) += G_MIN_STABILITY;
+        
     }
 };
 

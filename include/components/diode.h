@@ -110,10 +110,38 @@ public:
                 I(n2) -= iC;
             }
         }
-
-        vd_prev = vd;
     }
+    
+    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
+        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        vd_prev = v1 - v2;
+    }
+    
+    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
+        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double vd = v1 - v2;
 
+        // 1. Parte Resistiva (Shockley Equation)
+        double Vt_total = _n * _Vt;
+        double id = _Is * (std::exp(vd / Vt_total) - 1.0);
+
+        // 2. Parte Capacitiva (se abilitata e siamo in transiente)
+        double ic = 0.0;
+        if (dt > 0 && _Cj0 > 0) {
+            double vd_cap = std::clamp(vd, -5.0, 0.5);
+            double Cj = (vd_cap < 0) ? 
+                        _Cj0 * std::pow(1.0 - vd_cap / _Vj, -_Mj) : 
+                        _Cj0 * 2.0;
+            
+            // i = C * dv/dt -> Approssimazione Eulero Forward/Backward coerente con lo stamp
+            ic = Cj * (vd - vd_prev) / dt;
+        }
+
+        return id + ic;
+    }
+    
     void reset() override {
         vd_prev = 0.0;
     }

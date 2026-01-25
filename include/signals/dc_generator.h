@@ -18,12 +18,12 @@ class DCGenerator : public SignalGenerator {
     DCGenerator(double sample_rate, double input_duration, double input_amplitude)
         : sample_rate(sample_rate), input_duration(input_duration), input_amplitude(input_amplitude) {}
 
-    std::vector<double> generate() override {
+    std::vector<double> generate(double input_gain) override {
         size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
         std::vector<double> signalIn(total_samples, 0.0);
         
         for (size_t i = 0; i < total_samples; ++i) {
-            signalIn[i] = input_amplitude;
+            signalIn[i] = input_gain * input_amplitude;
         }
         
         return signalIn;

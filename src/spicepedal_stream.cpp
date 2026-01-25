@@ -85,7 +85,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
 
-        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
+        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, max_iterations, tolerance);
 
         initializeParameters();
     }

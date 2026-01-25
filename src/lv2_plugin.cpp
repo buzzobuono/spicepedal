@@ -73,7 +73,6 @@ static LV2_Handle instantiate(
         plugin->solver = new RealTimeSolver(
             *plugin->circuit,
             sample_rate,
-            25000,
             15,
             1e-6
         );

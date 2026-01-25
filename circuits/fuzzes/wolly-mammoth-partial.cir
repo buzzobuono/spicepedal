@@ -5,31 +5,29 @@ VCC 9 0 DC 9
 * Two stage amplifier
 R3 9 1 51k
 R4 9 2 20k
-Q1 1 3 0 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
-Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
+Q1 1 3 0 Q2N3904
+Q2 2 1 5 Q2N3904
+*Q2.1 2 1 15 QMOD ; MPSA13
+*Q2.2 2 15 5 QMOD
+.model QMOD Q Is=360f Bf=337 Br=4
+.model 2N3904 Q Bf=160.1 Br=5.944 Is=4.639e-15 Vt=0.02585
 
-* Pinch pot
 R2 3 4 100k
 Ppinch 4 5 8 500k param=pinch taper=LIN
 W1 8 5
 
-* Wool pot
 C6 5 6 100u
 R1 8 0 2.2k
-Pwool 6 10 0 2k param=wool taper=LIN
-
-Bgain 10 0 V="gain*V(2)" Rs=1
+Pwool 6 11 0 2k param=wool taper=LIN
 
 C1 7 3 0.22u
 C2 3 0 10n
 
 .input 7
-.output 10
+.output 2
 .warmup 60
 .ctrl 0 pinch 0.0 1.0
 .ctrl 1 wool 0.0 1.0
-.ctrl 2 gain 0.0 5.0
-.param pinch 0.9
-.param wool 0.1
-.param gain 1
+.param pinch 0.5
+.param wool 0.5
 *.probe V(7) V(2)

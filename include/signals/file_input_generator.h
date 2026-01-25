@@ -26,7 +26,7 @@ class FileInputGenerator : public SignalGenerator {
     FileInputGenerator(double sample_rate, const std::string& input_file, double input_amplitude)
         : target_sample_rate(sample_rate), input_file(input_file), input_amplitude(input_amplitude) {}
 
-    std::vector<double> generate() override {
+    std::vector<double> generate(double input_gain) override {
         WavHelper wav_helper;
         
         WavData wav_data = wav_helper.read(input_file);
@@ -71,6 +71,8 @@ class FileInputGenerator : public SignalGenerator {
         }
 
         for (double& s : signalIn) s *= scale;
+
+        for (double& s : signalIn) s *= input_gain;
 
         return signalIn;
     }

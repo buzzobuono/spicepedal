@@ -18,7 +18,7 @@ class LinearFrequencySweepGenerator : public SignalGenerator {
     LinearFrequencySweepGenerator(double sample_rate, double input_duration, double input_amplitude)
         : sample_rate(sample_rate), input_duration(input_duration), input_amplitude(input_amplitude) {}
 
-    std::vector<double> generate() override {
+    std::vector<double> generate(double input_gain) override {
         size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
         std::vector<double> signalIn(total_samples, 0.0);
         int f_start = 1;
@@ -27,7 +27,7 @@ class LinearFrequencySweepGenerator : public SignalGenerator {
         for (size_t i = 0; i < total_samples; ++i) {
             double t = i / sample_rate;
             double phase = 2.0 * M_PI * (f_start * t + 0.5 * k * t * t);
-            signalIn[i] = input_amplitude * std::sin(phase);
+            signalIn[i] = input_gain * input_amplitude * std::sin(phase);
         }
 
         return signalIn;

@@ -169,10 +169,12 @@ public:
         if (nb != 0) I(nb) -= sign * ieq_b;
         if (nc != 0) I(nc) -= sign * ieq_c;
         if (ne != 0) I(ne) -= sign * ieq_e;
-        
-        // Save for next iteration
-        vbe_prev = (bjt_type == PNP) ? -vbe : vbe;
-        vbc_prev = (bjt_type == PNP) ? -vbc : vbc;
+                   
+                   // Stabilizzazione diagonale per evitare nodi flottanti (G_MIN)
+        if (nc != 0) G(nc, nc) += G_MIN_STABILITY;
+        if (nb != 0) G(nb, nb) += G_MIN_STABILITY;
+        if (ne != 0) G(ne, ne) += G_MIN_STABILITY;
+
     }
     
     void updateHistory(const Eigen::VectorXd& V, double dt) override {
@@ -189,6 +191,38 @@ public:
             vbe_prev = -vbe_prev;
             vbc_prev = -vbc_prev;
         }
+    }
+           
+    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+        (void)dt; // Il modello Ebers-Moll base è statico
+
+        // Leggi tensioni attuali
+        double vc = (nc != 0) ? V(nc) : 0.0;
+        double vb = (nb != 0) ? V(nb) : 0.0;
+        double ve = (ne != 0) ? V(ne) : 0.0;
+        
+        double vbe = vb - ve;
+        double vbc = vb - vc;
+        
+        // Per PNP, invertiamo le polarità per usare le stesse formule
+        if (bjt_type == PNP) {
+            vbe = -vbe;
+            vbc = -vbc;
+        }
+
+        // Correnti dei diodi interni (Senza limitJunction qui, vogliamo il valore reale)
+        double exp_vbe = std::exp(std::min(vbe / VT, 80.0));
+        double exp_vbc = std::exp(std::min(vbc / VT, 80.0));
+        
+        double if_diode = IS * (exp_vbe - 1.0); 
+        double ir_diode = IS * (exp_vbc - 1.0);
+        
+        // Corrente di Collettore (Ic)
+        // Ic = If - Ir - (Ir/BR) -> Versione completa Ebers-Moll
+        double ic = if_diode - ir_diode * (1.0 + 1.0/BR);
+        
+        // Se il tipo è PNP, la corrente fisica esce dal collettore (segno invertito)
+        return (bjt_type == PNP) ? -ic : ic;
     }
     
     void reset() override {

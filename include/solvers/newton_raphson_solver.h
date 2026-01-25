@@ -30,7 +30,9 @@ class NewtonRaphsonSolver : public Solver {
         this->input_voltage = 0.0; 
         
         for (int i = 0; i < warmup_samples; i++) {
-            runNewtonRaphson(dt); 
+            if (runNewtonRaphson(dt)) {
+                this->updateComponentsHistory(dt);
+            } 
         }
         
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
@@ -81,7 +83,6 @@ class NewtonRaphsonSolver : public Solver {
             V = V_new;
             
             if (error_sq < tolerance_sq) {
-                this->updateComponentsHistory(dt);
                 this->iteration_count += iter + 1;
                 return true;
             }
@@ -94,14 +95,14 @@ class NewtonRaphsonSolver : public Solver {
     
     public:
     
-    NewtonRaphsonSolver(Circuit& circuit, double sample_rate, int source_impedance, int max_iterations, double tolerance) 
+    NewtonRaphsonSolver(Circuit& circuit, double sample_rate, int max_iterations, double tolerance) 
         : circuit(circuit), 
           sample_rate(sample_rate),
           dt(1.0 / sample_rate),
-          source_g(1.0 / source_impedance),
           max_iterations(max_iterations),
           tolerance_sq(tolerance*tolerance) {
-                  
+              
+              source_g = 1.0 / circuit.source_impedance;
     }
     
     virtual ~NewtonRaphsonSolver() = default;

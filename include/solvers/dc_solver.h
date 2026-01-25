@@ -15,7 +15,7 @@ class DCSolver : public NewtonRaphsonSolver {
     public:
     
     DCSolver(Circuit& circuit, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, 1.0, 1, max_iterations, tolerance) 
+        : NewtonRaphsonSolver(circuit, 1.0, max_iterations, tolerance) 
     {
         
     }
