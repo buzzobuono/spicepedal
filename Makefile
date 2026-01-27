@@ -17,6 +17,7 @@ CIRCUIT_FILE = circuits/default.cir
 PLUGIN_URI = http://github.com/buzzobuono/spicepedal\#default
 
 LV2_BUNDLE = spicepedal.$(CIRCUIT).lv2
+LV2_BUILD_DIR = lv2/$(LV2_BUNDLE)
 LV2_INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
 PLUGIN_SO = spicepedal-$(CIRCUIT).so
 USER_LV2_DIR = $(HOME)/.lv2
@@ -60,7 +61,7 @@ clean_spicepedal-plot:
 	@rm -f bin/spicepedal-plot
 
 create_bin_folder:
-	@mkdir -p bin/ lib/
+	@mkdir -p bin/
 
 lv2-all: lv2-clean lv2-bazz-fuss lv2-lowpass-rc lv2-highpass-rc lv2-wolly-mammoth lv2-tone-stack
 
@@ -88,41 +89,66 @@ lv2-tremolo:
 		CIRCUIT_FILE="circuits/tremolo.cir" \
 		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#tremolo"
 
-lv2: lv2-clean lv2-uninstall
+lv2: lv2-clean lv2-build-dir lv2-ttl
 	@echo "Compilazione LV2 (Circuit: $(CIRCUIT))"
-	@echo 
-	@mkdir -p lib
-	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES)		src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG} -DPLUGIN_URI='"$(PLUGIN_URI)"'
+	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o $(LV2_BUILD_DIR)/$(PLUGIN_SO) ${DEBUG} -DPLUGIN_URI='"$(PLUGIN_URI)"'
 
-lv2-install: $(LV2_INSTALL_DIR) lv2-ttl lv2
-	@cp lib/$(PLUGIN_SO) $(LV2_INSTALL_DIR)/
-	@cp -r $(CIRCUIT_FILE) $(LV2_INSTALL_DIR)/circuit.cir
+lv2-install: lv2-uninstall lv2-install-dir lv2
+	@cp -r $(LV2_BUILD_DIR)/* $(LV2_INSTALL_DIR)/
 	@echo "Plugin LV2 (Circuit: $(CIRCUIT)) installed in $(LV2_INSTALL_DIR)"
 	@echo "Test with: jalv $(PLUGIN_URI)"
 
-$(LV2_INSTALL_DIR):
+lv2-install-dir:
 	@mkdir -p $(LV2_INSTALL_DIR)
 
 lv2-uninstall:
 	@rm -rf $(LV2_INSTALL_DIR)
 
-lv2-clean:
-	@rm -f lib/$(PLUGIN_SO)
+lv2-build-dir:
+	@mkdir -p $(LV2_BUILD_DIR)
 
-lv2-ttl: $(CIRCUIT_FILE) ttl/spicepedal-head.ttl
+lv2-clean:
+	@rm -rf $(LV2_BUILD_DIR)
+
+lv2-circuit: $(CIRCUIT_FILE)
+	cp $(CIRCUIT_FILE) $(LV2_BUILD_DIR)/circuit.cir
+
+#lv2-ttl: lv2-circuit $(CIRCUIT_FILE) lv2-build-dir
+#	@mkdir -p $(BIN_INSTALL_DIR)
+#	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' -e 's|@PLUGIN_SO@|$(PLUGIN_SO)|g' ttl/manifest.ttl > $(LV2_BUILD_DIR)/manifest.ttl
+#	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal-head.ttl > $(LV2_BUILD_DIR)/spicepedal.ttl
+#	@grep "^\.ctrl" $(CIRCUIT_FILE) | awk '{ \
+#		idx=$$2; sym=$$3; min=$$4; max=$$5; \
+#		printf "    ,\n"; \
+#		printf "    [\n        a lv2:InputPort ,\n            lv2:ControlPort ;\n"; \
+#		printf "        lv2:index %d ;\n", idx + 4; \
+#		printf "        lv2:symbol \"%s\" ;\n", sym; \
+#		printf "        lv2:name \"%s\" ;\n", toupper(substr(sym,1,1)) substr(sym,2); \
+#		printf "        lv2:default %s ;\n", min; \
+#		printf "        lv2:minimum %s ;\n", min; \
+#		printf "        lv2:maximum %s ;\n", max; \
+# printf "    ]\n"; \
+#	}' >> $(LV2_BUILD_DIR)/spicepedal.ttl
+#	@echo "    ." >> $(LV2_BUILD_DIR)/spicepedal.ttl
+
+lv2-ttl: lv2-circuit $(CIRCUIT_FILE) lv2-build-dir
 	@mkdir -p $(BIN_INSTALL_DIR)
-	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' -e 's|@PLUGIN_SO@|$(PLUGIN_SO)|g' ttl/manifest.ttl > $(LV2_INSTALL_DIR)/manifest.ttl
-	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal-head.ttl > $(LV2_INSTALL_DIR)/spicepedal.ttl
-	@grep "^\.ctrl" $(CIRCUIT_FILE) | awk '{ \
-		idx=$$2; sym=$$3; min=$$4; max=$$5; \
-		printf "    ,\n"; \
-		printf "    [\n        a lv2:InputPort ,\n            lv2:ControlPort ;\n"; \
-		printf "        lv2:index %d ;\n", idx + 4; \
-		printf "        lv2:symbol \"%s\" ;\n", sym; \
-		printf "        lv2:name \"%s\" ;\n", toupper(substr(sym,1,1)) substr(sym,2); \
-		printf "        lv2:default %s ;\n", min; \
-		printf "        lv2:minimum %s ;\n", min; \
-		printf "        lv2:maximum %s ;\n", max; \
- printf "    ]\n"; \
-	}' >> $(LV2_INSTALL_DIR)/spicepedal.ttl
-	@echo "    ." >> $(LV2_INSTALL_DIR)/spicepedal.ttl
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' -e 's|@PLUGIN_SO@|$(PLUGIN_SO)|g' ttl/manifest.ttl > $(LV2_BUILD_DIR)/manifest.ttl
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal-head.ttl > $(LV2_BUILD_DIR)/spicepedal.ttl
+	@awk '{ \
+		if ($$1 == ".param") { defs[$$2] = $$3 } \
+		if ($$1 == ".ctrl") { \
+			idx=$$2; sym=$$3; min=$$4; max=$$5; \
+			val_default = (sym in defs) ? defs[sym] : min; \
+			printf "    ,\n"; \
+			printf "    [\n        a lv2:InputPort ,\n            lv2:ControlPort ;\n"; \
+			printf "        lv2:index %d ;\n", idx + 4; \
+			printf "        lv2:symbol \"%s\" ;\n", sym; \
+			printf "        lv2:name \"%s\" ;\n", toupper(substr(sym,1,1)) substr(sym,2); \
+			printf "        lv2:default %s ;\n", val_default; \
+			printf "        lv2:minimum %s ;\n", min; \
+			printf "        lv2:maximum %s ;\n", max; \
+			printf "    ]\n"; \
+		} \
+	}' $(CIRCUIT_FILE) >> $(LV2_BUILD_DIR)/spicepedal.ttl
+	@echo "    ." >> $(LV2_BUILD_DIR)/spicepedal.ttl

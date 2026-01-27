@@ -119,20 +119,24 @@ public:
                             value = std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
                             paramIds[currentParamIndex].store(value);
                             circuit.setCtrlParamValue(currentParamIndex, value);
+                            std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 
                         case 'B':  // ↓
                             value = std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
                             paramIds[currentParamIndex].store(value);
                             circuit.setCtrlParamValue(currentParamIndex, value);
+                            std::cout << "   Parameter " << currentParamIndex << " set to " << value << std::endl;
                         break;
 
                         case 'D':  // ←
                             currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
+                            std::cout << "   Change Parameter to " << currentParamIndex << std::endl;
                         break;
 
                         case 'C':  // →
                             currentParamIndex = (currentParamIndex + 1) % paramIds.size();
+                            std::cout << "   Change Parameter to " << currentParamIndex << std::endl;
                         break;
                     }
 

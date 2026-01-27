@@ -541,7 +541,6 @@ public:
         value = std::clamp(value, 0.0, 1.0);
         double actualValue = param.min + (value * (param.max - param.min));
         params.set(param.name, actualValue);
-        std::cout << "   Parameter " << param.name << " set to " << actualValue << std::endl;
     }
 
     void reset() {
