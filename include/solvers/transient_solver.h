@@ -23,7 +23,9 @@ class TransientSolver : public NewtonRaphsonSolver {
     std::unique_ptr<SignalGenerator> signal_generator;
     std::string output_file;
     bool bypass;
+    bool clipping;
     double input_gain;
+    double output_gain;
     double mean = 0.0f;
     double maxNormalized = 0.0;
     double scale = 1;
@@ -34,11 +36,13 @@ class TransientSolver : public NewtonRaphsonSolver {
     
     public:
     
-    TransientSolver(Circuit& circuit, double sample_rate, std::unique_ptr<SignalGenerator> signal_generator, double input_gain, std::string output_file, bool bypass, int max_iterations, double tolerance)
+    TransientSolver(Circuit& circuit, double sample_rate, std::unique_ptr<SignalGenerator> signal_generator, double input_gain, double output_gain, std::string output_file, bool bypass, bool clipping, int max_iterations, double tolerance)
         : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
           signal_generator(std::move(signal_generator)),
           input_gain(input_gain),
+          output_gain(output_gain),
           bypass(bypass),
+          clipping(clipping),
           output_file(output_file)
     {
         signalIn = this->signal_generator->generate(input_gain);
@@ -97,7 +101,10 @@ class TransientSolver : public NewtonRaphsonSolver {
             } else {
                 signalOut[i] = signalIn[i];
             }
-                
+            signalOut[i] = output_gain * signalOut[i];
+            if (clipping) {
+                signalOut[i] = std::tanh(signalOut[i]);
+            }
             // Update statistics
             peak_in = std::max(peak_in, std::abs(signalIn[i]));
             peak_out = std::max(peak_out, std::abs(signalOut[i]));

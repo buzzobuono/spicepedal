@@ -411,11 +411,14 @@ public:
                         iss >> input_node;
                         std::string attributes;
                         std::getline(iss, attributes);
-                        source_impedance = parseNumericValue(parseAttributeValue(attributes, "Zsrc", "15k"));
-                        std::cout << "   Directive Input Node: " << input_node << " Zsrc=" << source_impedance << std::endl;
+                        source_impedance = parseNumericValue(parseAttributeValue(attributes, "Z", "15k"));
+                        std::cout << "   Directive Input Node: " << input_node
+                        << " Z=" << source_impedance
+                        << std::endl;
                     } else if (directive == ".output") {
                         iss >> output_node;
-                        std::cout << "   Directive Output Node: " << output_node << std::endl;
+                        std::cout << "   Directive Output Node: " << output_node
+                        << std::endl;
                     } else if (directive == ".probe") {
                         std::string token;
                         std::cout << "   Directive Probe:" << std::endl;

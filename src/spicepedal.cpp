@@ -33,10 +33,12 @@ private:
     double input_duration;
     double input_amplitude;
     double input_gain_db;
+    double output_gain_db;
     bool frequency_sweep_log;
     bool frequency_sweep_lin;
     bool input_pulse;
     bool bypass;
+    bool clipping;
     int max_iterations;
     double tolerance;
 
@@ -51,10 +53,12 @@ public:
                      double input_duration,
                      double input_amplitude,
                      double input_gain_db,
+                     double output_gain_db,
                      bool frequency_sweep_log,
                      bool frequency_sweep_lin,
                      bool input_pulse,
                      bool bypass,
+                     bool clipping,
                      int max_iterations,
                      double tolerance,
                      std::string output_file
@@ -66,10 +70,12 @@ public:
           input_duration(input_duration),
           input_amplitude(input_amplitude),
           input_gain_db(input_gain_db),
+          output_gain_db(output_gain_db),
           frequency_sweep_log(frequency_sweep_log),
           frequency_sweep_lin(frequency_sweep_lin),
           input_pulse(input_pulse),
           bypass(bypass),
+          clipping(clipping),
           max_iterations(max_iterations),
           tolerance(tolerance),
           output_file(output_file)
@@ -95,7 +101,7 @@ public:
             solver = std::make_unique<ZOutSolver>(circuit, sample_rate, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
         } else if (analysis_type == "TRAN") {
             std::unique_ptr<SignalGenerator> signal_generator = getSignalGenerator();
-            solver = std::make_unique<TransientSolver>(circuit, sample_rate, std::move(signal_generator), std::pow(10.0, input_gain_db / 20.0), output_file, bypass, max_iterations, tolerance);
+            solver = std::make_unique<TransientSolver>(circuit, sample_rate, std::move(signal_generator), std::pow(10.0, input_gain_db / 20.0), std::pow(10.0, output_gain_db / 20.0), output_file, bypass, clipping, max_iterations, tolerance);
         }
             
         solver->initialize();
@@ -148,6 +154,7 @@ int main(int argc, char *argv[]) {
     std::string output_file;
     std::string netlist_file;
     bool bypass = false;
+    bool clipping = false;
     int max_iterations = 20;
     double tolerance = 1e-6;
     
@@ -168,6 +175,7 @@ int main(int argc, char *argv[]) {
     
     app.add_option("-c,--circuit", netlist_file, "Netlist File")->check(CLI::ExistingFile)->required();
     app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(bypass);
+    app.add_flag("--cl,--clipping", clipping, "Soft Output Clipping")->default_val(clipping);
     
     app.add_option("-m,--max-iterations", max_iterations, "Max Solver's Iterations")->default_val(max_iterations);
     app.add_option("-t,--tolerance", tolerance, "Solver's Tolerance")->default_val(tolerance);
@@ -181,11 +189,11 @@ int main(int argc, char *argv[]) {
     std::cout << "   Input Duration: " << input_duration << "s" << std::endl;
     std::cout << "   Input Amplitude: " << input_amplitude << "V" << std::endl;
     std::cout << "   Input Gain: " << input_gain_db << "dB" << std::endl;
+    std::cout << "   Output Gain: " << output_gain_db << "dB" << std::endl;
     std::cout << "   Frequency Sweep Logarithmic: " << (frequency_sweep_log ? "True" : "False") << std::endl;
     std::cout << "   Frequency Sweep Linear: " << (frequency_sweep_log ? "True" : "False") << std::endl;
     std::cout << "   Input Pulse: " << (input_pulse ? "True" : "False") << std::endl;
     std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
-    std::cout << "   Output Gain: " << output_gain_db << "dB" << std::endl;
     std::cout << "   Output File: " << output_file << std::endl;
     std::cout << "   Circuit File: " << netlist_file << std::endl;
     std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
@@ -194,7 +202,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_file, input_frequency, input_duration, input_amplitude, input_gain_db, frequency_sweep_log, frequency_sweep_lin, input_pulse, bypass, max_iterations, tolerance, output_file);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_file, input_frequency, input_duration, input_amplitude, input_gain_db, output_gain_db, frequency_sweep_log, frequency_sweep_lin, input_pulse, bypass, clipping, max_iterations, tolerance, output_file);
         if (!processor.process()) {
             return 1;
         }

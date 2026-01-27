@@ -3,5 +3,5 @@
 
 <@PLUGIN_URI@>
     a lv2:Plugin ;
-    lv2:binary <spicepedal.so> ;
+    lv2:binary <@PLUGIN_SO@> ;
     rdfs:seeAlso <spicepedal.ttl> .

@@ -1,0 +1,68 @@
+@prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
+@prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix pg:    <http://lv2plug.in/ns/ext/port-groups#> .
+@prefix foaf:  <http://xmlns.com/foaf/0.1/> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix opts:  <http://lv2plug.in/ns/ext/options#> .
+@prefix atom:  <http://lv2plug.in/ns/ext/atom#> .
+@prefix urid:  <http://lv2plug.in/ns/ext/urid#> .
+
+<@PLUGIN_URI@>
+    a lv2:Plugin ,
+        lv2:SimulatorPlugin ;
+    
+    doap:name "SpicePedal (@CIRCUIT@)" ;
+    doap:description "A realtime simple spice-like simulator for audio" ;
+    doap:license <https://opensource.org/licenses/MIT> ;
+    doap:maintainer [
+        foaf:name "Buzzobuono" ;
+        foaf:homepage <https://github.com/buzzobuono>
+    ] ;
+    
+    lv2:optionalFeature lv2:hardRTCapable ;
+    
+    lv2:port [
+        a lv2:AudioPort ,
+            lv2:InputPort ;
+        lv2:index 0 ;
+        lv2:symbol "in" ;
+        lv2:name "Audio Input" ;
+        lv2:shortName "In"
+    ]
+    , 
+    [
+        a lv2:AudioPort ,
+            lv2:OutputPort ;
+        lv2:index 1 ;
+        lv2:symbol "out" ;
+        lv2:name "Audio Output" ;
+        lv2:shortName "Out"
+    ] 
+    ,
+    [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 2 ;
+        lv2:symbol "gain" ;
+        lv2:name "Input Gain" ;
+        lv2:shortName "Gain" ;
+        lv2:default 0.15 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 2.0
+    ]
+    ,
+    [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 3 ;
+        lv2:symbol "bypass" ;
+        lv2:name "Bypass" ;
+        lv2:shortName "Bypass" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0 ;
+        lv2:portProperty lv2:toggled ;
+        lv2:designation lv2:enabled
+    ]

@@ -15,10 +15,10 @@ LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 CIRCUIT = default
 CIRCUIT_FILE = circuits/default.cir
 PLUGIN_URI = http://github.com/buzzobuono/spicepedal\#default
-LV2_BUNDLE = spicepedal.$(CIRCUIT).lv2
-INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
 
-PLUGIN_SO = spicepedal.so
+LV2_BUNDLE = spicepedal.$(CIRCUIT).lv2
+LV2_INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
+PLUGIN_SO = spicepedal-$(CIRCUIT).so
 USER_LV2_DIR = $(HOME)/.lv2
 BIN_INSTALL_DIR = $(HOME)/bin
 
@@ -70,22 +70,10 @@ lv2-bazz-fuss:
 		CIRCUIT_FILE="circuits/fuzzes/bazz-fuss.cir" \
 		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#bazz-fuss"
 
-lv2-lowpass-rc:
-	@$(MAKE) lv2-install \
-		CIRCUIT="lowpass-rc" \
-		CIRCUIT_FILE="circuits/filters/lowpass-rc.cir" \
-		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#lowpass-rc"
-
-lv2-highpass-rc:
-	@$(MAKE) lv2-install \
-		CIRCUIT="highpass-rc" \
-		CIRCUIT_FILE="circuits/filters/highpass-rc.cir" \
-		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#highpass-rc"
-
 lv2-wolly-mammoth:
 	@$(MAKE) lv2-install \
 		CIRCUIT="wolly-mammoth" \
-		CIRCUIT_FILE="circuits/fuzzes/wolly-mammoth-partial.cir" \
+		CIRCUIT_FILE="circuits/fuzzes/wolly-mammoth.cir" \
 		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#wolly-mammoth"
 
 lv2-tone-stack:
@@ -100,23 +88,41 @@ lv2-tremolo:
 		CIRCUIT_FILE="circuits/tremolo.cir" \
 		PLUGIN_URI="http://github.com/buzzobuono/spicepedal#tremolo"
 
-lv2: lv2-clean
+lv2: lv2-clean lv2-uninstall
 	@echo "Compilazione LV2 (Circuit: $(CIRCUIT))"
 	@echo 
 	@mkdir -p lib
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES)		src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG} -DPLUGIN_URI='"$(PLUGIN_URI)"'
 
-lv2-install: lv2
-	@mkdir -p $(INSTALL_DIR)
-	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
-	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/manifest.ttl > $(INSTALL_DIR)/manifest.ttl
-	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal.ttl > $(INSTALL_DIR)/spicepedal.ttl
-	@cp -r $(CIRCUIT_FILE) $(INSTALL_DIR)/circuit.cir
-	@echo "✓ Plugin LV2 (Circuit: $(CIRCUIT)) installato in $(INSTALL_DIR)"
+lv2-install: $(LV2_INSTALL_DIR) lv2-ttl lv2
+	@cp lib/$(PLUGIN_SO) $(LV2_INSTALL_DIR)/
+	@cp -r $(CIRCUIT_FILE) $(LV2_INSTALL_DIR)/circuit.cir
+	@echo "Plugin LV2 (Circuit: $(CIRCUIT)) installed in $(LV2_INSTALL_DIR)"
 	@echo "Test with: jalv $(PLUGIN_URI)"
+
+$(LV2_INSTALL_DIR):
+	@mkdir -p $(LV2_INSTALL_DIR)
+
+lv2-uninstall:
+	@rm -rf $(LV2_INSTALL_DIR)
 
 lv2-clean:
 	@rm -f lib/$(PLUGIN_SO)
 
-lv2-uninstall:
-	rm -rf $(INSTALL_DIR)
+lv2-ttl: $(CIRCUIT_FILE) ttl/spicepedal-head.ttl
+	@mkdir -p $(BIN_INSTALL_DIR)
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' -e 's|@PLUGIN_SO@|$(PLUGIN_SO)|g' ttl/manifest.ttl > $(LV2_INSTALL_DIR)/manifest.ttl
+	@sed -e 's|@CIRCUIT@|$(CIRCUIT)|g' -e 's|@PLUGIN_URI@|$(PLUGIN_URI)|g' ttl/spicepedal-head.ttl > $(LV2_INSTALL_DIR)/spicepedal.ttl
+	@grep "^\.ctrl" $(CIRCUIT_FILE) | awk '{ \
+		idx=$$2; sym=$$3; min=$$4; max=$$5; \
+		printf "    ,\n"; \
+		printf "    [\n        a lv2:InputPort ,\n            lv2:ControlPort ;\n"; \
+		printf "        lv2:index %d ;\n", idx + 4; \
+		printf "        lv2:symbol \"%s\" ;\n", sym; \
+		printf "        lv2:name \"%s\" ;\n", toupper(substr(sym,1,1)) substr(sym,2); \
+		printf "        lv2:default %s ;\n", min; \
+		printf "        lv2:minimum %s ;\n", min; \
+		printf "        lv2:maximum %s ;\n", max; \
+ printf "    ]\n"; \
+	}' >> $(LV2_INSTALL_DIR)/spicepedal.ttl
+	@echo "    ." >> $(LV2_INSTALL_DIR)/spicepedal.ttl
