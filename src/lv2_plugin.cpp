@@ -14,23 +14,29 @@
 typedef enum {
     PORT_INPUT = 0,
     PORT_OUTPUT = 1,
-    PORT_GAIN = 2,
-    PORT_BYPASS = 3,
-    PORT_PARAM0 = 4,
-    PORT_PARAM1 = 5,
-    PORT_PARAM2 = 6,
-    PORT_PARAM3 = 7
+    PORT_INPUT_GAIN = 2,
+    PORT_OUTPUT_GAIN = 3,
+    PORT_BYPASS = 4,
+    PORT_PARAM0 = 5,
+    PORT_PARAM1 = 6,
+    PORT_PARAM2 = 7,
+    PORT_PARAM3 = 8,
+    PORT_PARAM4 = 9,
+    PORT_PARAM5 = 10
 } PortIndex;
 
 typedef struct {
     const float* input;
     float* output;
-    const float* gain;
+    const float* input_gain;
+    const float* output_gain;
     const float* bypass;
     const float* param0;
     const float* param1;
     const float* param2;
     const float* param3;
+    const float* param4;
+    const float* param5;
     Circuit* circuit;
     RealTimeSolver* solver;
     double sample_rate;
@@ -48,12 +54,15 @@ static LV2_Handle instantiate(
     SpicePedalPlugin* plugin = new SpicePedalPlugin();
     plugin->input = nullptr;
     plugin->output = nullptr;
-    plugin->gain = nullptr;
+    plugin->input_gain = nullptr;
+    plugin->output_gain = nullptr;
     plugin->bypass = nullptr;
     plugin->param0 = nullptr;
     plugin->param1 = nullptr;
     plugin->param2 = nullptr;
     plugin->param3 = nullptr;
+    plugin->param4 = nullptr;
+    plugin->param5 = nullptr;
     plugin->bundle_path = std::string(bundle_path);
 
     plugin->sample_rate = sample_rate;
@@ -101,6 +110,12 @@ static void set_param_values(SpicePedalPlugin* plugin) {
         if (id == 3) {
             plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param3));
         }
+        if (id == 4) {
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param4));
+        }
+        if (id == 5) {
+            plugin->circuit->setCtrlParamValue(id, static_cast<double>(*plugin->param5));
+        }
     }
 }
 
@@ -118,8 +133,11 @@ static void connect_port(
         case PORT_OUTPUT:
             plugin->output = (float*)data;
             break;
-        case PORT_GAIN:
-            plugin->gain = (const float*)data;
+        case PORT_INPUT_GAIN:
+            plugin->input_gain = std::pow(10.0, (const float*)data / 20.0);
+            break;
+        case PORT_OUTPUT_GAIN:
+            plugin->output_gain = std::pow(10.0, (const float*)data / 20.0);
             break;
         case PORT_BYPASS:
             plugin->bypass = (const float*)data;
@@ -136,7 +154,12 @@ static void connect_port(
         case PORT_PARAM3:
             plugin->param3 = (const float*)data;
             break;
-        
+        case PORT_PARAM4:
+            plugin->param4 = (const float*)data;
+            break;
+        case PORT_PARAM5:
+            plugin->param5 = (const float*)data;
+            break;
     }
 }
 
@@ -156,7 +179,9 @@ static void run(LV2_Handle instance, uint32_t n_samples)
     const float* input = plugin->input;
     float* output = plugin->output;
     
-    float gain = *(plugin->gain);
+    float input_gain = *(plugin->input_gain);
+    float output_gain = *(plugin->output_gain);
+    
     bool bypass = (*(plugin->bypass) > 0.5f);
     
     set_param_values(plugin);
@@ -171,7 +196,7 @@ static void run(LV2_Handle instance, uint32_t n_samples)
     }
     
     for (uint32_t i = 0; i < n_samples; ++i) {
-        float vin = static_cast<float>(input[i]) * gain;
+        float vin = static_cast<float>(input[i]) * input_gain;
         
         plugin->solver->setInputVoltage(vin);
         
@@ -187,6 +212,8 @@ static void run(LV2_Handle instance, uint32_t n_samples)
         if (std::isnan(vout) || std::isinf(vout)) {
             vout = 0.0f;
         }
+        
+        vout = output_gain * vout;
         
         if (vout > 1.0f) vout = 1.0f;
         if (vout < -1.0f) vout = -1.0f;

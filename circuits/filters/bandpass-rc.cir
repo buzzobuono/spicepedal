@@ -22,7 +22,7 @@ Rload 7 0 1M
 
 .input 1
 .output 7
-.probe bandpass-rc.csv V(1) V(7)
+.probe V(1) V(7)
 
 * RISPOSTA ATTESA:
 * ───────────────────────────────────────

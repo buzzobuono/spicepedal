@@ -14,6 +14,7 @@
 #include <locale>
 #include <filesystem>
 
+#include "utils/debug.h"
 #include "utils/param_registry.h"
 #include "components/component.h"
 #include "components/voltage_source.h"
@@ -47,6 +48,7 @@ struct CtrlParam {
     std::string name;
     double min;
     double max;
+    double step;
 };
 
 class Circuit {
@@ -63,7 +65,9 @@ public:
     std::map<int, CtrlParam> ctrl_params;
     std::vector<ProbeTarget> probes;
     std::string probe_file;
-
+    int currentParam = 0;
+    
+    
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
@@ -79,9 +83,11 @@ public:
 
         netlistContent = preprocessNetlist(netlistContent);
         
-        std::ofstream dbg("debug.cir");
-        dbg << netlistContent;
-        dbg.close();
+        #ifdef DEBUG_MODE
+            std::ofstream dbg("debug.cir");
+            dbg << netlistContent;
+            dbg.close();
+        #endif
         
         std::istringstream fileStream(netlistContent);
         std::string line;
@@ -451,13 +457,14 @@ public:
                     } else if (directive == ".ctrl") {
                         int id;
                         std::string param;
-                        double min, max;
-                        iss >> id >> param >> min >> max;
-                        ctrl_params[id] = {param, min, max};
+                        double min, max, step;
+                        iss >> id >> param >> min >> max >> step;
+                        ctrl_params[id] = {param, min, max, step};
                         std::cout << "   Directive Ctrl id=" << id
                         << " param=" << param <<
                         " min=" << min <<
                         " max=" << max <<
+                        " step=" << step <<
                         std::endl;
                     } else if (directive == ".param") {
                         std::string p_name;
@@ -526,23 +533,51 @@ public:
         }
         return ids;
     }
-    
+
     double getCtrlParamValue(int id) const {
         auto it = ctrl_params.find(id);
         const auto& param = it->second;
-        double actualValue = params.get(param.name);
-        double normalized = (actualValue - param.min) / (param.max - param.min);
-        return std::clamp(normalized, 0.0, 1.0);
+        return params.get(param.name);
     }
 
-    void setCtrlParamValue(int id, double value) {
+    double setCtrlParamValue(int id, double value) {
         auto it = ctrl_params.find(id);
         const auto& param = it->second;
-        value = std::clamp(value, 0.0, 1.0);
-        double actualValue = param.min + (value * (param.max - param.min));
+        double actualValue = std::clamp(value, param.min, param.max);
         params.set(param.name, actualValue);
+        return actualValue;
     }
-
+    
+    void incrementCtrlParamValue() {
+        auto it = ctrl_params.find(currentParam);
+        const auto& param = it->second;
+        double actualValue = std::clamp(params.get(param.name) + param.step, param.min, param.max);
+        params.set(param.name, actualValue);
+        std::cout << "Param '" << param.name << "': " << actualValue << std::endl;
+    }
+    
+    void decrementCtrlParamValue() {
+        auto it = ctrl_params.find(currentParam);
+        const auto& param = it->second;
+        double actualValue = std::clamp(params.get(param.name) - param.step, param.min, param.max);
+        params.set(param.name, actualValue);
+        std::cout << "Param '" << param.name << "': " << actualValue << std::endl;
+    }
+    
+    void nextCtrlParam() {
+        currentParam = (currentParam + 1) % ctrl_params.size();
+        auto it = ctrl_params.find(currentParam);
+        const auto& param = it->second;
+        std::cout << "Param '" << param.name << "' selected" << std::endl;
+    }
+    
+    void previousCtrlParam() {
+        currentParam = (currentParam - 1 + ctrl_params.size()) % ctrl_params.size();
+        auto it = ctrl_params.find(currentParam);
+        const auto& param = it->second;
+        std::cout << "Param '" << param.name << "' selected" << std::endl;
+    }
+    
     void reset() {
         for (auto& comp : components) {
             comp->reset();

@@ -45,8 +45,8 @@ Pvol 13 0 14 10k param=volume taper=LIN
 .param wool .9
 .param eq .3
 .param volume 1
-.ctrl 0 pinch 0.0 1.0
-.ctrl 1 wool 0.0 1.0
-.ctrl 2 eq 0.0 1.0
-.ctrl 3 volume 0.0 1.0
+.ctrl 0 pinch 0.0 1.0 0.05
+.ctrl 1 wool 0.0 1.0 0.05
+.ctrl 2 eq 0.0 1.0 0.05
+.ctrl 3 volume 0.0 1.0 0.05
 *.probe V(14)

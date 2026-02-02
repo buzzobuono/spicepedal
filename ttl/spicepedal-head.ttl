@@ -45,18 +45,30 @@
         a lv2:InputPort ,
             lv2:ControlPort ;
         lv2:index 2 ;
-        lv2:symbol "gain" ;
-        lv2:name "Input Gain" ;
-        lv2:shortName "Gain" ;
-        lv2:default 1.0 ;
-        lv2:minimum 0.0 ;
-        lv2:maximum 2.0
+        lv2:symbol "input_gain" ;
+        lv2:name "Input Gain (dB)" ;
+        lv2:shortName "Input Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -60.0 ;
+        lv2:maximum +60.0
     ]
     ,
     [
         a lv2:InputPort ,
             lv2:ControlPort ;
         lv2:index 3 ;
+        lv2:symbol "output_gain" ;
+        lv2:name "Output Gain (dB)" ;
+        lv2:shortName "Ouput Gain" ;
+        lv2:default 0.0 ;
+        lv2:minimum -60.0 ;
+        lv2:maximum +60.0
+    ]
+    ,
+    [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 4 ;
         lv2:symbol "bypass" ;
         lv2:name "Bypass" ;
         lv2:shortName "Bypass" ;
