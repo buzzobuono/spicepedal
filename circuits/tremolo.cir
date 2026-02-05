@@ -9,5 +9,5 @@ B_GAIN 2 0 V="V(1) * (1 + modulation)" Rs=1
 .input 1
 .output 2
 .probe V(1) V(2)
-.ctrl 0 depth 0.0 1.0
-.ctrl 1 speed 1.0 16.0
+.ctrl 0 depth 0.0 1.0 0.1
+.ctrl 1 speed 1.0 16.0 0.5

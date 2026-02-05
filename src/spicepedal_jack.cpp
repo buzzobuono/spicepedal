@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <jack/jack.h>
 #include <sndfile.h>
+#include <portaudio.h>
 #include <samplerate.h>
 
 #include "external/CLI11.hpp"
@@ -122,6 +123,9 @@ public:
         if (!client) throw std::runtime_error("JACK server not running");
 
         sample_rate = jack_get_sample_rate(client);
+        
+        DEBUG_LOG("Hardware Sample Rate rilevato: " << sample_rate << " Hz");
+
         solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, max_iterations, tolerance);
         solver->initialize();
         
@@ -131,14 +135,12 @@ public:
         jack_set_process_callback(client, jack_callback, this);
         jack_on_shutdown(client, jack_shutdown, this);
 
-        sample_rate = jack_get_sample_rate(client);
         this->ratio = sample_rate / (double)sfinfo.samplerate;
         
-        int max_jack_nframes = 8192;
-        this->src_buffer_size = max_jack_nframes;
-        this->src_buffer = new float[max_jack_nframes * sfinfo.channels];
+        this->src_buffer_size = 8192;
+        this->src_buffer = new float[this->src_buffer_size * sfinfo.channels];
         
-        int max_frames_to_read = (int)(max_jack_nframes / this->ratio) + 16;
+        int max_frames_to_read = (int)(this->src_buffer_size / this->ratio) + 16;
         this->input_buf.resize(max_frames_to_read * sfinfo.channels);
         
         int error;
@@ -157,6 +159,8 @@ public:
             sf_close(infile);
             infile = nullptr;
         }
+        if (src_buffer) delete[] src_buffer;
+        if (src_state) src_delete(src_state);
     }
 
     int process(jack_nframes_t nframes) {
@@ -194,7 +198,7 @@ public:
             if (solver->solve()) {
                 last_vout = output_gain * solver->getOutputVoltage();
             }
-                
+
             if (!std::isfinite(last_vout)) last_vout = 0.0f;
             if (clipping) last_vout = std::tanh(last_vout);
             
@@ -209,7 +213,8 @@ public:
         stats.cpuExecutionTime.store(cpuExecutionTime);
         stats.bufferDeadline.store(bufferDeadline);
         stats.cpuLoadPercentage.store(cpuLoadPercentage);
-        if (cpuExecutionTime > stats.peakCpuTime) stats.peakCpuTime.store(stats.cpuExecutionTime);
+        if (cpuExecutionTime > stats.peakCpuTime.load()) stats.peakCpuTime.store(stats.cpuExecutionTime);
+        
         return 0;
     }
 
@@ -253,7 +258,7 @@ public:
         return true;
     }
 
-    void startStreaming() {
+    void start() {
         jack_activate(client);
 
         const char **ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical|JackPortIsInput);
@@ -264,6 +269,7 @@ public:
         }
 
         setNonBlocking(true);
+        
         printControls();
 
         auto lastReport = std::chrono::high_resolution_clock::now();
@@ -274,12 +280,11 @@ public:
             auto now = std::chrono::high_resolution_clock::now();
             if (std::chrono::duration<double>(now - lastReport).count() > 1.0) {
                 DEBUG_LOG(
-                "CPU: " << stats.cpuExecutionTime.load() << " ms,"
-                << " Deadline: " << stats.bufferDeadline.load() << " ms,"
-                << " Load: " << stats.cpuLoadPercentage.load() << " %,"
-                << " Peak: " << stats.peakCpuTime.load() << " ms"
+                    "CPU: " << stats.cpuExecutionTime.load() << " ms,"
+                    << " Deadline: " << stats.bufferDeadline.load() << " ms,"
+                    << " Load: " << stats.cpuLoadPercentage.load() << " %,"
+                    << " Peak: " << stats.peakCpuTime.load() << " ms"
                 );
-            
                 lastReport = now;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -300,8 +305,8 @@ int main(int argc, char* argv[]) {
     int max_iterations = 50;
     bool clipping = false;
 
-    app.add_option("-i,--input", input_file, "WAV input")->required()->check(CLI::ExistingFile);
-    app.add_option("-c,--circuit", netlist_file, "SPICE netlist")->required()->check(CLI::ExistingFile);
+    app.add_option("-i,--input", input_file, "Input File")->check(CLI::ExistingFile);
+    app.add_option("-c,--circuit", netlist_file, "Netlist File")->check(CLI::ExistingFile)->required();
     app.add_option("--ig,--input-gain", input_gain_db, "Input Gain in dB")->default_val(0.0);
     app.add_option("--og,--output-gain", output_gain_db, "Output Gain in dB")->default_val(0.0);
     app.add_flag("--cl,--clipping", clipping, "Soft Output Clipping")->default_val(clipping);
@@ -311,8 +316,8 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app, argc, argv);
 
     try {
-        SpicePedalJackProcessor proc(netlist_file, input_file, input_gain_db, output_gain_db, clipping, max_iterations, tolerance);
-        proc.startStreaming();
+        SpicePedalJackProcessor processor(netlist_file, input_file, input_gain_db, output_gain_db, clipping, max_iterations, tolerance);
+        processor.start();
     } catch (const std::exception& e) {
         std::cerr << "Fatal: " << e.what() << std::endl;
         return 1;
