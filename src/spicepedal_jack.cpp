@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <jack/jack.h>
 #include <sndfile.h>
+#include <portaudio.h>
 #include <samplerate.h>
 
 #include "external/CLI11.hpp"
@@ -194,7 +195,7 @@ public:
             if (solver->solve()) {
                 last_vout = output_gain * solver->getOutputVoltage();
             }
-                
+
             if (!std::isfinite(last_vout)) last_vout = 0.0f;
             if (clipping) last_vout = std::tanh(last_vout);
             
@@ -209,7 +210,7 @@ public:
         stats.cpuExecutionTime.store(cpuExecutionTime);
         stats.bufferDeadline.store(bufferDeadline);
         stats.cpuLoadPercentage.store(cpuLoadPercentage);
-        if (cpuExecutionTime > stats.peakCpuTime) stats.peakCpuTime.store(stats.cpuExecutionTime);
+        if (cpuExecutionTime > stats.peakCpuTime.load()) stats.peakCpuTime.store(stats.cpuExecutionTime);
         return 0;
     }
 
@@ -253,7 +254,7 @@ public:
         return true;
     }
 
-    void startStreaming() {
+    void start() {
         jack_activate(client);
 
         const char **ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical|JackPortIsInput);
@@ -300,8 +301,8 @@ int main(int argc, char* argv[]) {
     int max_iterations = 50;
     bool clipping = false;
 
-    app.add_option("-i,--input", input_file, "WAV input")->required()->check(CLI::ExistingFile);
-    app.add_option("-c,--circuit", netlist_file, "SPICE netlist")->required()->check(CLI::ExistingFile);
+    app.add_option("-i,--input", input_file, "Input File")->check(CLI::ExistingFile);
+    app.add_option("-c,--circuit", netlist_file, "Netlist File")->check(CLI::ExistingFile)->required();
     app.add_option("--ig,--input-gain", input_gain_db, "Input Gain in dB")->default_val(0.0);
     app.add_option("--og,--output-gain", output_gain_db, "Output Gain in dB")->default_val(0.0);
     app.add_flag("--cl,--clipping", clipping, "Soft Output Clipping")->default_val(clipping);
@@ -311,8 +312,8 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app, argc, argv);
 
     try {
-        SpicePedalJackProcessor proc(netlist_file, input_file, input_gain_db, output_gain_db, clipping, max_iterations, tolerance);
-        proc.startStreaming();
+        SpicePedalJackProcessor processor(netlist_file, input_file, input_gain_db, output_gain_db, clipping, max_iterations, tolerance);
+        processor.start();
     } catch (const std::exception& e) {
         std::cerr << "Fatal: " << e.what() << std::endl;
         return 1;
