@@ -45,15 +45,17 @@ public:
         freq_window.assign(freq_n, 0.0);
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         double g_out = 1000.0;
         if (n_out != 0) {
             G(n_out, n_out) += g_out;
             I(n_out) += smoothed_freq * g_out;
         }
     }
-
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    
+    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         static double internal_time = 0;
         internal_time += dt;
 

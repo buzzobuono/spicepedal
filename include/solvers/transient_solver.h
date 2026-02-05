@@ -85,6 +85,7 @@ class TransientSolver : public NewtonRaphsonSolver {
         scale = signal_generator->getScaleFactor();
         
         std::vector<double> signalOut(signalIn.size());
+        double lastOutput = 0.0;
         
         for (size_t i = 0; i < signalIn.size(); i++) {
             if (!bypass) {
@@ -92,11 +93,13 @@ class TransientSolver : public NewtonRaphsonSolver {
                 this->setInputVoltage(signalIn[i]);
                 bool converged = runNewtonRaphson(dt);
                 if (converged) {
-                    signalOut[i] = this->getOutputVoltage();
-                }
-                logProbes();
-                if (converged) {
+                    lastOutput = this->getOutputVoltage();
+                    signalOut[i] = lastOutput;
+                    logProbes();
                     updateComponentsHistory(dt);
+                } else {
+                    signalOut[i] = lastOutput;
+                    logProbes();
                 }
             } else {
                 signalOut[i] = signalIn[i];

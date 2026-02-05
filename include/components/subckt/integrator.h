@@ -21,9 +21,8 @@ public:
         type = ComponentType::SUBCIRCUIT;
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I,
-               const Eigen::VectorXd& V, double dt) override 
-    {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         // Catturiamo l'input attuale per lo step
         current_input = V(n_in);
 
@@ -38,7 +37,8 @@ public:
         }
     }
 
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    //void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         // L'integrazione avviene solo qui, una volta per step temporale
         accumulator += V(n_in) * dt;
 

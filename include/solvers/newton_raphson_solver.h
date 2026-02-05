@@ -10,11 +10,20 @@ class NewtonRaphsonSolver : public Solver {
     protected:
     
     Circuit& circuit;
-    Eigen::MatrixXd G;
+    
+    /*Eigen::MatrixXd G;
     Eigen::VectorXd I;
     Eigen::VectorXd V, V_new;
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
+    */
     
+    typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 32, 32> FixedMatrix;
+    typedef Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 32, 1> FixedVector;
+    FixedMatrix G;
+    FixedVector I;
+    FixedVector V, V_new;
+    Eigen::PartialPivLU<FixedMatrix> lu_solver;
+  
     double sample_rate;
     double input_voltage;
     double source_g;
@@ -77,7 +86,7 @@ class NewtonRaphsonSolver : public Solver {
             I(0) = 0.0;
             
             lu_solver.compute(G);
-            V_new = lu_solver.solve(I);
+            V_new.noalias() = lu_solver.solve(I);
             
             double error_sq = (V_new - V).squaredNorm();
             V = V_new;

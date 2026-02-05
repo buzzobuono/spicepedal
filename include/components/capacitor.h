@@ -29,7 +29,9 @@ public:
         i_prev = 0.0;
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
+
         if (dt <= 0.0) {
             // Caso DC: condensatore aperto
             return;
@@ -52,7 +54,8 @@ public:
         }
     }
 
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         double v_n1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v_n2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         double v = v_n1 - v_n2;
@@ -67,7 +70,8 @@ public:
         i_prev = 0.0; // Assumendo che parta da regime
     }
 
-    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+    // double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+    double getCurrent(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) const override {
         if (dt <= 0.0) {
             return 0.0; // In DC il condensatore è un circuito aperto
         }

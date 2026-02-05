@@ -23,7 +23,10 @@ public:
         nodes = {n_p, n_m};
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+   
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
+
         if (!is_initialized) init_exprtk(V);
         
         sync_variables(V, dt);

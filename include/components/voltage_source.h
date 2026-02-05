@@ -25,8 +25,9 @@ public:
         rs = Rs;
     }
     
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
-               const Eigen::VectorXd& V, double dt) override {
+   
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
         double g = 1.0 / rs;
         int n1 = nodes[0], n2 = nodes[1];
         

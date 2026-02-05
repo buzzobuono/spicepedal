@@ -40,9 +40,9 @@ public:
             throw std::runtime_error("MOSFET: parametri non validi");
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I,
-               const Eigen::VectorXd& V, double dt) override
-    {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
+
         double vd = (nd > 0) ? V(nd - 1) : 0.0;
         double vg = (ng > 0) ? V(ng - 1) : 0.0;
         double vs = (ns > 0) ? V(ns - 1) : 0.0;

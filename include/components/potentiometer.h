@@ -25,9 +25,9 @@ private:
     double _r_total;
     TaperType _taper;
     std::string _param;
-
     
-    void stampInternalResistor(Eigen::MatrixXd& G, int nA, int nB, double res) {
+    // void stampInternalResistor(Eigen::MatrixXd& G, int nA, int nB, double res) {
+    void stampInternalResistor(Eigen::Ref<Eigen::MatrixXd> G, int nA, int nB, double res) {
         if (nA == nB || res > R_MAX) return;
 
         double g = 1.0 / std::max(res, R_MIN_SAFE);
@@ -76,8 +76,8 @@ public:
         this->nodes = {n1, n2, nw};
     }
 
-    void stamp(Eigen::MatrixXd &G, Eigen::VectorXd &I, const Eigen::VectorXd &V, double dt) override
-    {
+    // void stamp(Eigen::MatrixXd &G, Eigen::VectorXd &I, const Eigen::VectorXd &V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         if (_r_total > R_MAX) return;
         
         double taperedPos = getTaperedPosition();

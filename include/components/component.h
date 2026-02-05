@@ -42,12 +42,23 @@ class Component {
         params = pr;
     }
     
-    virtual void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
+    /*
+    virtual void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I,
                       const Eigen::VectorXd& V, double dt) = 0;
     
     virtual void updateHistory(const Eigen::VectorXd& V, double dt) {}
     
     virtual double getCurrent(const Eigen::VectorXd& V, double dt) const { return 0.0; };
+    */
+    
+    virtual void stamp(Eigen::Ref<Eigen::MatrixXd> G, 
+                       Eigen::Ref<Eigen::VectorXd> I, 
+                       const Eigen::Ref<const Eigen::VectorXd>& V, 
+                       double dt) = 0;
+    
+    virtual void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) {}
+    
+    virtual double getCurrent(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) const { return 0.0; };
     
     virtual void reset() {}
     

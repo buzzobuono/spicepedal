@@ -30,7 +30,8 @@ public:
         last_state = 0;
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         // Il tracker si comporta come una sorgente di tensione ideale (V-Source) sull'uscita
         // che impone la tensione pari alla frequenza calcolata.
         
@@ -41,7 +42,8 @@ public:
         }
     }
 
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    //void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         double v_in = V(n_in);
         static double internal_time = 0;
         internal_time += dt;

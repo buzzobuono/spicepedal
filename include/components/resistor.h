@@ -23,8 +23,9 @@ public:
         _r = r;
     }
     
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-        
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+
         if (_r > R_MAX) return;
 
         double g = 1.0 / std::max(_r, R_MIN);
@@ -41,7 +42,8 @@ public:
         
     }
     
-    double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+    // double getCurrent(const Eigen::VectorXd& V, double dt) const override {
+    double getCurrent(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) const override {
         (void)dt; // dt non è usato per il calcolo statico del resistore
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;

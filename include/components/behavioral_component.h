@@ -64,7 +64,9 @@ protected:
     }
 
 public:
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    
+    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         time_internal += dt; 
         for(int i=0; i < V.size(); ++i) {
             v_nodes_prev[i] = V(i);

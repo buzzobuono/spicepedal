@@ -36,7 +36,8 @@ public:
         //fftw_free(fft_out);
     }
 
-    void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    //void updateHistory(const Eigen::VectorXd& V, double dt) override {
+    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         sample_rate = 1.0 / dt;
         buffer[buffer_ptr++] = V(n_in);
 
@@ -91,7 +92,8 @@ public:
         }
     }
 
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         double g_out = 1e6; // Aumentiamo la forza del Vnodo
         if (n_out != 0) {
             G(n_out, n_out) += g_out;

@@ -1,9 +1,15 @@
 PREFIX ?= /usr/local
 DESTDIR ?=
 BINDIR = $(PREFIX)/bin
+FAST_MATH ?= 1
+DEBUG ?= 0
 
 CXX ?= g++
-CXXFLAGS += -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -ffast-math -flto -funroll-loops -fno-finite-math-only #-Wall -Wextra -fsanitize=address 
+CXXFLAGS += -std=c++17 -O3 -march=native -DNDEBUG -DEIGEN_NO_DEBUG -flto -funroll-loops -fno-math-errno -fno-trapping-math #-Wall -Wextra -fsanitize=address
+
+ifeq ($(FAST_MATH), 1)
+    CXXFLAGS += -ffast-math -freciprocal-math -fassociative-math -fno-signed-zeros -mprefer-vector-width=256
+endif
 
 ifeq ($(DEBUG), 1)
     CXXFLAGS += -DDEBUG_MODE
@@ -30,20 +36,17 @@ LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
 all: bin/spicepedal bin/spicepedal-stream bin/spicepedal-jack bin/spicepedal-plot
 
-bin/%: | bin
-	@echo "Building $@"
-
 bin/spicepedal: src/spicepedal.cpp | bin
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_SNDFILE) $(LIBS_SAMPLERATE)
 
 bin/spicepedal-stream: src/spicepedal_stream.cpp | bin
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) $(LIBS_PORTAUDIO) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) $(LIBS_PORTAUDIO)
 
 bin/spicepedal-jack: src/spicepedal_jack.cpp | bin
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@  $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) $(LIBS_JACK) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@  $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) $(LIBS_JACK)
 
 bin/spicepedal-plot: src/spicepedal_plot.cpp | bin
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_FFTW3) ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LIBS_FFTW3)
 
 bin:
 	@mkdir -p bin

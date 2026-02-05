@@ -19,9 +19,8 @@ public:
         nodes = { n1, n2 };
     }
     
-    void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
-               const Eigen::VectorXd& V, double dt) override {
-                   
+    //void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
+    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
         int n1 = nodes[0], n2 = nodes[1];
         Resistor r(name , n1, n2, 1e-3);
         r.stamp(G, I, V, dt);
