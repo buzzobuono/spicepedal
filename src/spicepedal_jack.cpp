@@ -123,6 +123,9 @@ public:
         if (!client) throw std::runtime_error("JACK server not running");
 
         sample_rate = jack_get_sample_rate(client);
+        
+        DEBUG_LOG("Hardware Sample Rate rilevato: " << sample_rate << " Hz");
+
         solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, max_iterations, tolerance);
         solver->initialize();
         
@@ -132,14 +135,12 @@ public:
         jack_set_process_callback(client, jack_callback, this);
         jack_on_shutdown(client, jack_shutdown, this);
 
-        sample_rate = jack_get_sample_rate(client);
         this->ratio = sample_rate / (double)sfinfo.samplerate;
         
-        int max_jack_nframes = 8192;
-        this->src_buffer_size = max_jack_nframes;
-        this->src_buffer = new float[max_jack_nframes * sfinfo.channels];
+        this->src_buffer_size = 8192;
+        this->src_buffer = new float[this->src_buffer_size * sfinfo.channels];
         
-        int max_frames_to_read = (int)(max_jack_nframes / this->ratio) + 16;
+        int max_frames_to_read = (int)(this->src_buffer_size / this->ratio) + 16;
         this->input_buf.resize(max_frames_to_read * sfinfo.channels);
         
         int error;
@@ -158,6 +159,8 @@ public:
             sf_close(infile);
             infile = nullptr;
         }
+        if (src_buffer) delete[] src_buffer;
+        if (src_state) src_delete(src_state);
     }
 
     int process(jack_nframes_t nframes) {
@@ -211,6 +214,7 @@ public:
         stats.bufferDeadline.store(bufferDeadline);
         stats.cpuLoadPercentage.store(cpuLoadPercentage);
         if (cpuExecutionTime > stats.peakCpuTime.load()) stats.peakCpuTime.store(stats.cpuExecutionTime);
+        
         return 0;
     }
 
@@ -265,6 +269,7 @@ public:
         }
 
         setNonBlocking(true);
+        
         printControls();
 
         auto lastReport = std::chrono::high_resolution_clock::now();
@@ -275,12 +280,11 @@ public:
             auto now = std::chrono::high_resolution_clock::now();
             if (std::chrono::duration<double>(now - lastReport).count() > 1.0) {
                 DEBUG_LOG(
-                "CPU: " << stats.cpuExecutionTime.load() << " ms,"
-                << " Deadline: " << stats.bufferDeadline.load() << " ms,"
-                << " Load: " << stats.cpuLoadPercentage.load() << " %,"
-                << " Peak: " << stats.peakCpuTime.load() << " ms"
+                    "CPU: " << stats.cpuExecutionTime.load() << " ms,"
+                    << " Deadline: " << stats.bufferDeadline.load() << " ms,"
+                    << " Load: " << stats.cpuLoadPercentage.load() << " %,"
+                    << " Peak: " << stats.peakCpuTime.load() << " ms"
                 );
-            
                 lastReport = now;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
