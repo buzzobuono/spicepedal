@@ -34,6 +34,9 @@ class Component {
     public:
     
     ComponentType type;
+    
+    bool is_static = false;
+    
     std::string name;
     std::vector<int> nodes;
     

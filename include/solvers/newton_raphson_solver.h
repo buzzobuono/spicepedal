@@ -22,6 +22,15 @@ class NewtonRaphsonSolver : public Solver {
 
     protected:
     
+    struct FastEntry {
+        double* address;
+        double value;
+    };
+    
+    std::vector<FastEntry> fast_G_entries;
+    
+    std::vector<Component*> dynamic_components;
+    
     #ifdef DEBUG_MODE
     std::map<ComponentType, ProfileData> stamp_stats;
     double lu_total_time_ns = 0;
@@ -61,6 +70,27 @@ class NewtonRaphsonSolver : public Solver {
     }
     
     virtual void stampComponents(double dt) {
+        for (const auto& entry : fast_G_entries) {
+            *(entry.address) += entry.value;
+        }
+        
+        for (auto* comp : dynamic_components) {
+            #ifdef DEBUG_MODE
+            auto start = std::chrono::high_resolution_clock::now();
+            #endif
+            
+            comp->stamp(G, I, V, dt);
+            
+            #ifdef DEBUG_MODE
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            stamp_stats[comp->type].total_time_ns += duration;
+            stamp_stats[comp->type].calls++;
+            #endif
+        }
+    }
+
+    virtual void stampComponents__(double dt) {
         for (auto& comp : circuit.components) {
             #ifdef DEBUG_MODE
             auto start = std::chrono::high_resolution_clock::now();
@@ -152,6 +182,31 @@ class NewtonRaphsonSolver : public Solver {
         V.resize(circuit.num_nodes);
         V_new.resize(circuit.num_nodes);
         V.setZero();
+        
+        fast_G_entries.clear();
+        dynamic_components.clear();
+        
+        for (auto& comp : circuit.components) {
+            if (comp->is_static) {
+                Matrix shadow_G(circuit.num_nodes, circuit.num_nodes);
+                Vector shadow_I(circuit.num_nodes), shadow_V(circuit.num_nodes);
+                shadow_G.setZero();
+                shadow_I.setZero();
+                shadow_V.setZero();
+                
+                comp->stamp(shadow_G, shadow_I, shadow_V, dt);
+                
+                for (int r = 0; r < circuit.num_nodes; ++r) {
+                    for (int c = 0; c < circuit.num_nodes; ++c) {
+                        if (shadow_G(r, c) != 0.0) {
+                            fast_G_entries.push_back({&G(r, c), shadow_G(r, c)});
+                        }
+                    }
+                }
+            } else {
+                dynamic_components.push_back(comp.get());
+            }
+        }
         
         this->initCounters();
         circuit.reset();

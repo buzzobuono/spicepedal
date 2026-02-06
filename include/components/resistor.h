@@ -21,6 +21,7 @@ public:
         name = comp_name;
         nodes = { n1, n2 };
         _r = r;
+        is_static = true;
     }
     
     void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
