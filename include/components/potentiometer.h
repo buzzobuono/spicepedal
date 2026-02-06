@@ -4,8 +4,8 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
-#include <algorithm> // per std::max e std::clamp
-#include <Eigen/Dense>
+#include <algorithm>
+
 #include "component.h"
 #include "components/resistor.h"
 
@@ -76,8 +76,7 @@ public:
         this->nodes = {n1, n2, nw};
     }
 
-    // void stamp(Eigen::MatrixXd &G, Eigen::VectorXd &I, const Eigen::VectorXd &V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
         if (_r_total > R_MAX) return;
         
         double taperedPos = getTaperedPosition();

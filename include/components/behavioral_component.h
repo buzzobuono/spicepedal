@@ -3,12 +3,14 @@
 
 #include "component.h"
 #include "external/exprtk.hpp"
+
 #include <string>
 #include <vector>
 #include <regex>
 
 class BehavioralComponent : public Component {
-protected:
+
+    protected:
     std::string expression_string;
     exprtk::symbol_table<double> symbol_table;
     exprtk::expression<double> expression;
@@ -65,8 +67,7 @@ protected:
 
 public:
     
-    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
-    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void updateHistory(const Vector& V, double dt) override {
         time_internal += dt; 
         for(int i=0; i < V.size(); ++i) {
             v_nodes_prev[i] = V(i);

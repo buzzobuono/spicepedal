@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
-#include <Eigen/Dense>
+
 #include "component.h"
 
 /*
@@ -51,9 +51,7 @@ public:
         _Mj = Mj;
     }
 
-    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
-        
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
         double vd = V(nodes[0]) - V(nodes[1]);
         vd = std::clamp(vd, -5.0, 1.0);
         
@@ -112,15 +110,13 @@ public:
         }
     }
     
-    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
-    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+   void updateHistory(const Vector& V, double dt) override {
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         vd_prev = v1 - v2;
     }
     
-    // double getCurrent(const Eigen::VectorXd& V, double dt) const override {
-    double getCurrent(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) const override {
+    double getCurrent(const Vector& V, double dt) const override {
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         double vd = v1 - v2;

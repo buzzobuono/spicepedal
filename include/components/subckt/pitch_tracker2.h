@@ -2,7 +2,7 @@
 #define PITCH_TRACKER_2_H
 
 #include "components/component.h"
-#include <Eigen/Dense>
+
 #include <vector>
 
 class PitchTracker2 : public Component {
@@ -45,8 +45,7 @@ public:
         freq_window.assign(freq_n, 0.0);
     }
 
-    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
         double g_out = 1000.0;
         if (n_out != 0) {
             G(n_out, n_out) += g_out;
@@ -54,8 +53,7 @@ public:
         }
     }
     
-    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
-    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void updateHistory(const Vector& V, double dt) override {
         static double internal_time = 0;
         internal_time += dt;
 

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <stdexcept>
-#include <Eigen/Dense>
+
 #include "component.h"
 
 class Inductor : public Component {
@@ -46,9 +46,7 @@ public:
         }
     }
     
-    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
-
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
         if (dt <= 0) {
             // Caso DC: induttore cortocircuitato trattato come resistenza con valore molto piccolo
             double g = 1e6; // Conduttanza molto alta (R ≈ 0)
@@ -101,8 +99,7 @@ public:
         if (n2 != 0) I(n2) += Ieq;
     }
     
-    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
-    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void updateHistory(const Vector& V, double dt) override {
         // Aggiorna le variabili di stato per il prossimo time step
         double v1 = (n1 != 0) ? V(n1) : 0.0;
         double v2 = (n2 != 0) ? V(n2) : 0.0;
@@ -119,8 +116,7 @@ public:
         v_prev = 0.0;
     }
     
-    // double getCurrent(const Eigen::VectorXd& V, double dt) const override {
-    double getCurrent(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) const override {
+    double getCurrent(const Vector& V, double dt) const override {
         if (dt <= 0.0) {
             // In DC l'induttore è un corto circuito. 
             // La corrente dipende dal resto del circuito, ma se c'è R_dc:

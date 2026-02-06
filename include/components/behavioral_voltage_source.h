@@ -3,7 +3,7 @@
 
 #include <string>
 #include <algorithm>
-#include <Eigen/Dense>
+
 #include "component.h"
 #include "behavioral_component.h"
 #include "external/exprtk.hpp"
@@ -24,9 +24,8 @@ public:
     }
 
    
-    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {     
-
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+        
         if (!is_initialized) init_exprtk(V);
         
         sync_variables(V, dt);

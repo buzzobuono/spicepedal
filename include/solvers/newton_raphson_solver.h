@@ -3,6 +3,8 @@
 
 #include "solvers/solver.h"
 #include "circuit.h"
+#include "utils/math.h"
+
 #include <Eigen/Dense>
 
 class NewtonRaphsonSolver : public Solver {
@@ -11,19 +13,12 @@ class NewtonRaphsonSolver : public Solver {
     
     Circuit& circuit;
     
-    /*Eigen::MatrixXd G;
-    Eigen::VectorXd I;
-    Eigen::VectorXd V, V_new;
-    Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
-    */
+    Matrix G;
+    Vector I;
+    Vector V, V_new;
+    Eigen::PartialPivLU<Matrix> lu_solver;
     
-    typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 32, 32> FixedMatrix;
-    typedef Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 32, 1> FixedVector;
-    FixedMatrix G;
-    FixedVector I;
-    FixedVector V, V_new;
-    Eigen::PartialPivLU<FixedMatrix> lu_solver;
-  
+    
     double sample_rate;
     double input_voltage;
     double source_g;

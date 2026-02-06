@@ -4,7 +4,7 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
-#include <Eigen/Dense>
+
 #include "component.h"
 
 class OpAmp : public Component {
@@ -49,8 +49,7 @@ public:
         V_headroom = 1.0; // regolato dinamicamente
     }
 
-    // void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-    void stamp(Eigen::Ref<Eigen::MatrixXd> G, Eigen::Ref<Eigen::VectorXd> I, const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
         double v_o = (n_out  != 0) ? V(n_out)  : 0.0;
         double v_p = (n_plus != 0) ? V(n_plus) : 0.0;
         double v_m = (n_minus!= 0) ? V(n_minus): 0.0;
@@ -126,8 +125,7 @@ public:
         v_out_prev = v_o;
     }
 
-    // void updateHistory(const Eigen::VectorXd& V, double dt) override {
-    void updateHistory(const Eigen::Ref<const Eigen::VectorXd>& V, double dt) override {
+    void updateHistory(const Vector& V, double dt) override {
         if (n_out != 0) v_out_prev = V(n_out);
     }
 
