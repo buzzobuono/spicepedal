@@ -67,7 +67,6 @@ public:
     std::string probe_file;
     int currentParam = 0;
     
-    
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {

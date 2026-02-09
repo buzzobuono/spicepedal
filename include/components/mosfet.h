@@ -20,7 +20,8 @@ private:
 
     double vgs_prev = 0.0;
     double vgd_prev = 0.0;
-
+    double dt = 0.0;
+    
 public:
     MOSFET(const std::string& comp_name, int drain, int gate, int source, Type t,
            double K_ = 0.2, double Vth_ = 2.0, double lambda_ = 0.01,
@@ -38,8 +39,11 @@ public:
             throw std::runtime_error("MOSFET: parametri non validi");
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         double vd = (nd > 0) ? V(nd - 1) : 0.0;
         double vg = (ng > 0) ? V(ng - 1) : 0.0;
         double vs = (ns > 0) ? V(ns - 1) : 0.0;

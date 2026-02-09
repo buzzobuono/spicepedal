@@ -66,8 +66,7 @@ public:
         }
     }
     
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // Read node voltages (handle ground)
         double vc = (nc != 0) ? V(nc) : 0.0;
         double vb = (nb != 0) ? V(nb) : 0.0;
@@ -174,8 +173,7 @@ public:
 
     }
     
-    void updateHistory(const Vector& V, double dt) override {
-
+    void updateHistory(const Vector& V) override {
         // For BJT, history is updated during stamp
         // But we can update vbe_prev, vbc_prev here for clarity
         double vc = (nc != 0) ? V(nc) : 0.0;
@@ -191,9 +189,7 @@ public:
         }
     }
     
-    double getCurrent(const Vector& V, double dt) const override {
-        (void)dt; // Il modello Ebers-Moll base è statico
-
+    double getCurrent(const Vector& V) const override {
         // Leggi tensioni attuali
         double vc = (nc != 0) ? V(nc) : 0.0;
         double vb = (nb != 0) ? V(nb) : 0.0;

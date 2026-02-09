@@ -126,7 +126,7 @@ public:
         
         DEBUG_LOG("Hardware Sample Rate rilevato: " << sample_rate << " Hz");
 
-        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, max_iterations, tolerance);
+        solver = std::make_unique<RealTimeSolver>(circuit, (1 / sample_rate), max_iterations, tolerance);
         solver->initialize();
         
         output_port_l = jack_port_register(client, "out_L", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);

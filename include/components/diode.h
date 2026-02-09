@@ -27,6 +27,7 @@ private:
     double _Mj;   // Grading coefficient
 
     double vd_prev = 0.0;
+    double dt = 0.0;
 
 public:
     Diode(const std::string& comp_name, int nn, int np,
@@ -51,7 +52,11 @@ public:
         _Mj = Mj;
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         double vd = V(nodes[0]) - V(nodes[1]);
         vd = std::clamp(vd, -5.0, 1.0);
         
@@ -110,13 +115,13 @@ public:
         }
     }
     
-   void updateHistory(const Vector& V, double dt) override {
+   void updateHistory(const Vector& V) override {
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         vd_prev = v1 - v2;
     }
     
-    double getCurrent(const Vector& V, double dt) const override {
+    double getCurrent(const Vector& V) const override {
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         double vd = v1 - v2;

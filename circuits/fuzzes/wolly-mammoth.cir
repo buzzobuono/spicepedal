@@ -36,17 +36,19 @@ C4 12 0 7.4n
 C4b 12 0 220n
 
 Peq 12 10 13 10k param=eq taper=LIN
-Pvol 13 0 14 10k param=volume taper=LIN
+*Pvol 13 0 14 10k param=volume taper=LIN
+Rvol 13 0 10k
 
 .input 7 Z=50k
-.output 14
+*.output 14
+.output 13
 .warmup 60
 .param pinch .9
 .param wool .9
 .param eq .3
-.param volume 1
+*.param volume 1
 .ctrl 0 pinch 0.0 1.0 0.05
 .ctrl 1 wool 0.0 1.0 0.05
 .ctrl 2 eq 0.0 1.0 0.05
-.ctrl 3 volume 0.0 1.0 0.05
+*.ctrl 3 volume 0.0 1.0 0.05
 *.probe V(14)

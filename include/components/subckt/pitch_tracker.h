@@ -16,7 +16,8 @@ private:
     // Filtro per stabilizzare l'uscita
     double smoothed_freq;
     double alpha;          // Fattore di smoothing (0.0 a 1.0)
-
+    double dt = 0.0;
+    
 public:
     PitchTracker(const std::string& name, int in, int out, double thr = 0.02, double smooth = 0.2)
         : n_in(in), n_out(out), threshold(thr), alpha(smooth) 
@@ -30,7 +31,11 @@ public:
         last_state = 0;
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // Il tracker si comporta come una sorgente di tensione ideale (V-Source) sull'uscita
         // che impone la tensione pari alla frequenza calcolata.
         
@@ -41,7 +46,7 @@ public:
         }
     }
 
-    void updateHistory(const Vector& V, double dt) override {
+    void updateHistory(const Vector& V) override {
         double v_in = V(n_in);
         static double internal_time = 0;
         internal_time += dt;

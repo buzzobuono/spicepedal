@@ -15,7 +15,7 @@ class DCSolver : public NewtonRaphsonSolver {
     public:
     
     DCSolver(Circuit& circuit, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, 1.0, max_iterations, tolerance) 
+        : NewtonRaphsonSolver(circuit, 0.0, max_iterations, tolerance) 
     {
         
     }
@@ -23,21 +23,19 @@ class DCSolver : public NewtonRaphsonSolver {
     ~DCSolver() override = default;
     
     bool solveImpl() override {
-        return runNewtonRaphson(0.0);
+        return runNewtonRaphson();
     }
     
     protected:
     
-    void stampComponents(double dt) override {
-        NewtonRaphsonSolver::stampComponents(0.0);
+    void stampComponents() override {
+        NewtonRaphsonSolver::stampComponents();
     }
     
-    void applySource(double dt) override {
-        (void)dt;
+    void applySource() override {
     }
     
-    void updateComponentsHistory(double dt) override {
-        (void)dt;
+    void updateComponentsHistory() override {
     }
     
     public:

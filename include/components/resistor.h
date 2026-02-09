@@ -24,8 +24,7 @@ public:
         is_static = true;
     }
     
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        
+    void stampStatic(Matrix& G, Vector& I) override {
         if (_r > R_MAX) return;
 
         double g = 1.0 / std::max(_r, R_MIN);
@@ -42,8 +41,7 @@ public:
         
     }
     
-    double getCurrent(const Vector& V, double dt) const override {
-        (void)dt; // dt non è usato per il calcolo statico del resistore
+    double getCurrent(const Vector& V) const override {
         double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         // Legge di Ohm: I = V/R

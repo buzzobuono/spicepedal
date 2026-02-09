@@ -14,8 +14,8 @@ class RealTimeSolver : public NewtonRaphsonSolver {
 
     public:
     
-    RealTimeSolver(Circuit& circuit, double sample_rate, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance)
+    RealTimeSolver(Circuit& circuit, double dt, int max_iterations, double tolerance)
+        : NewtonRaphsonSolver(circuit, dt, max_iterations, tolerance)
     {
         
     }
@@ -41,8 +41,8 @@ class RealTimeSolver : public NewtonRaphsonSolver {
     }
 
     bool solveImpl() override {
-        if (runNewtonRaphson(dt)) {
-            updateComponentsHistory(dt);
+        if (runNewtonRaphson()) {
+            updateComponentsHistory();
             return true;
         }
         return false;

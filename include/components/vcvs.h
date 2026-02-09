@@ -30,7 +30,7 @@ public:
         nodes = {n_out_p, n_out_m, n_ctrl_p, n_ctrl_m};
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // 1. Recupero tensioni ai nodi di controllo
         double v_cp = (n_ctrl_p != 0) ? V(n_ctrl_p) : 0.0;
         double v_cm = (n_ctrl_m != 0) ? V(n_ctrl_m) : 0.0;

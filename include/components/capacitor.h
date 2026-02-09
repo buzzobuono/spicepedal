@@ -10,7 +10,8 @@ class Capacitor : public Component {
     double C;
     double v_prev;   // tensione al passo precedente
     double i_prev;   // corrente equivalente al passo precedente
-
+    double _geq;
+    
 public:
     Capacitor(const std::string& comp_name, int node1, int node2, double capacitance) {
         if (capacitance <= 0) {
@@ -27,36 +28,52 @@ public:
         i_prev = 0.0;
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        if (dt <= 0.0) {
-            // Caso DC: condensatore aperto
+    void prepare(const Vector& V, double dt) override {
+        if (dt > 0.0) {
+            _geq = 2.0 * C / dt;
+        } else {
+            _geq = 0.0; // Caso DC
+        }
+    }
+    
+    void stampStatic(Matrix& G, Vector& I) override {
+        if (_geq <= 0.0) {
+            // Caso DC
             return;
         }
-        // Trapezoidal rule
-        double geq = 2.0 * C / dt;          // equivalente conductance
-        double ieq = geq * v_prev + i_prev; // corrente equivalente
-
+        
         int n1 = nodes[0], n2 = nodes[1];
 
         if (n1 != 0) {
-            G(n1, n1) += geq;
-            if (n2 != 0) G(n1, n2) -= geq;
-            I(n1) += ieq;
+            G(n1, n1) += _geq;
+            if (n2 != 0) G(n1, n2) -= _geq;
         }
         if (n2 != 0) {
-            G(n2, n2) += geq;
-            if (n1 != 0) G(n2, n1) -= geq;
-            I(n2) -= ieq;
+            G(n2, n2) += _geq;
+            if (n1 != 0) G(n2, n1) -= _geq;
         }
     }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
+        if (_geq <= 0.0) {
+            // Caso DC
+            return;
+        }
+        
+        double ieq = _geq * v_prev + i_prev;
 
-    void updateHistory(const Vector& V, double dt) override {
+        int n1 = nodes[0], n2 = nodes[1];
+        
+        if (n1 != 0) I(n1) += ieq;
+        if (n2 != 0) I(n2) -= ieq;
+    }
+    
+    void updateHistory(const Vector& V) override {
         double v_n1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v_n2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         double v = v_n1 - v_n2;
         
-        double geq = 2.0 * C / dt;
-        i_prev = geq * (v - v_prev) - i_prev;
+        i_prev = _geq * (v - v_prev) - i_prev;
         v_prev = v;
     }
 
@@ -65,19 +82,16 @@ public:
         i_prev = 0.0; // Assumendo che parta da regime
     }
 
-    double getCurrent(const Vector& V, double dt) const override {
-        if (dt <= 0.0) {
-            return 0.0; // In DC il condensatore è un circuito aperto
+    double getCurrent(const Vector& V) const override {
+        if (_geq <= 0.0) {
+            return 0.0;
         }
 
         double v_n1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
         double v_n2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
         double v_now = v_n1 - v_n2;
 
-        // Corrente calcolata con la regola del trapezio:
-        // i(n) = (2*C/dt) * (v(n) - v(n-1)) - i(n-1)
-        double geq = 2.0 * C / dt;
-        double current = geq * (v_now - v_prev) - i_prev;
+        double current = _geq * (v_now - v_prev) - i_prev;
 
         return current;
     }

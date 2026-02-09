@@ -28,6 +28,7 @@ private:
     Circuit circuit;
     std::string analysis_type;
     double sample_rate;
+    double dt;
     std::string input_file;
     int input_frequency;
     double input_duration;
@@ -65,6 +66,7 @@ public:
                     )
         : analysis_type(analysis_type),
           sample_rate(sample_rate),
+          dt(1 / sample_rate),
           input_file(input_file),
           input_frequency(input_frequency),
           input_duration(input_duration),
@@ -96,12 +98,12 @@ public:
         if (analysis_type == "DC") {
             solver = std::make_unique<DCSolver>(circuit, max_iterations, tolerance);
         } else if (analysis_type == "ZIN") {
-            solver = std::make_unique<ZInSolver>(circuit, sample_rate, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            solver = std::make_unique<ZInSolver>(circuit, dt, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
         } else if (analysis_type == "ZOUT") {
-            solver = std::make_unique<ZOutSolver>(circuit, sample_rate, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
+            solver = std::make_unique<ZOutSolver>(circuit, dt, input_amplitude, input_frequency, input_duration, max_iterations, tolerance);
         } else if (analysis_type == "TRAN") {
             std::unique_ptr<SignalGenerator> signal_generator = getSignalGenerator();
-            solver = std::make_unique<TransientSolver>(circuit, sample_rate, std::move(signal_generator), std::pow(10.0, input_gain_db / 20.0), std::pow(10.0, output_gain_db / 20.0), output_file, bypass, clipping, max_iterations, tolerance);
+            solver = std::make_unique<TransientSolver>(circuit, dt, std::move(signal_generator), std::pow(10.0, input_gain_db / 20.0), std::pow(10.0, output_gain_db / 20.0), output_file, bypass, clipping, max_iterations, tolerance);
         }
             
         solver->initialize();

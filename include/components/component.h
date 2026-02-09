@@ -46,11 +46,15 @@ class Component {
         params = pr;
     }
     
-    virtual void stamp(Matrix& G, Vector& I, const Vector& V, double dt) = 0;
+    virtual void prepare(const Vector& V, double dt) {};
+
+    virtual void stampStatic(Matrix& G, Vector& I) {};
     
-    virtual void updateHistory(const Vector& V, double dt) {}
+    virtual void stamp(Matrix& G, Vector& I, const Vector& V) {};
     
-    virtual double getCurrent(const Vector& V, double dt) const { return 0.0; };
+    virtual void updateHistory(const Vector& V) {};
+    
+    virtual double getCurrent(const Vector& V) const { return 0.0; };
     
     virtual void reset() {}
     

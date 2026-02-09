@@ -14,8 +14,7 @@ public:
         nodes = {}; 
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        if (!is_initialized) init_exprtk(V);
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         sync_variables(V, dt);
         double value = expression.value();
         if (params) {

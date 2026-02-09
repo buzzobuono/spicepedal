@@ -9,7 +9,8 @@ private:
     double Rout;
     double accumulator = 0.0;
     double current_input = 0.0;
-
+    double dt;
+    
 public:
     // in: nodo frequenza (CV), out: nodo fase
     Integrator(const std::string& comp_name, int in, int out, double rout = 1.0)
@@ -20,7 +21,11 @@ public:
         type = ComponentType::SUBCIRCUIT;
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // Catturiamo l'input attuale per lo step
         current_input = V(n_in);
 
@@ -35,7 +40,7 @@ public:
         }
     }
 
-    void updateHistory(const Vector& V, double dt) override {
+    void updateHistory(const Vector& V) override {
         // L'integrazione avviene solo qui, una volta per step temporale
         accumulator += V(n_in) * dt;
 

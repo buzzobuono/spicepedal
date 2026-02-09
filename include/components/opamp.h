@@ -25,7 +25,9 @@ private:
     double V_headroom;
     double v_out_prev;
     bool enable_slew;
-
+    
+    double dt = 0.0;
+    
 public:
     OpAmp(const std::string& comp_name,
           int out, int plus, int minus, int vcc, int vee,
@@ -49,7 +51,11 @@ public:
         V_headroom = 1.0; // regolato dinamicamente
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         double v_o = (n_out  != 0) ? V(n_out)  : 0.0;
         double v_p = (n_plus != 0) ? V(n_plus) : 0.0;
         double v_m = (n_minus!= 0) ? V(n_minus): 0.0;
@@ -125,7 +131,7 @@ public:
         v_out_prev = v_o;
     }
 
-    void updateHistory(const Vector& V, double dt) override {
+    void updateHistory(const Vector& V) override {
         if (n_out != 0) v_out_prev = V(n_out);
     }
 

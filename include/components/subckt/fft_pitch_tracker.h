@@ -12,12 +12,10 @@ private:
     std::vector<double> buffer;
     int buffer_ptr = 0;
     
-    //double *fft_in;
-    //fftw_complex *fft_out;
-    //fftw_plan plan;
+    double g_out = 1e6;
 
     double current_freq = 0;
-    double sample_rate = 44100.0;
+    double sample_rate;
 
 public:
     FFTPitchTracker(const std::string& name, int in, int out, int size = 8192) 
@@ -26,20 +24,16 @@ public:
         nodes = {n_in, n_out};
         type = ComponentType::SUBCIRCUIT;
         buffer.resize(buffer_size, 0.0);
-        
-        //fft_in = (double*) fftw_malloc(sizeof(double) * buffer_size);
-        //fft_out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * (buffer_size / 2 + 1));
-        //plan = fftw_plan_dft_r2c_1d(buffer_size, fft_in, fft_out, FFTW_ESTIMATE);
-    }
+        }
 
     ~FFTPitchTracker() {
-        //fftw_destroy_plan(plan);
-        //fftw_free(fft_in);
-        //fftw_free(fft_out);
     }
 
-    void updateHistory(const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
         sample_rate = 1.0 / dt;
+    }
+    
+    void updateHistory(const Vector& V) override {
         buffer[buffer_ptr++] = V(n_in);
 
         if (buffer_ptr >= buffer_size) {
@@ -93,10 +87,14 @@ public:
         }
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
-        double g_out = 1e6; // Aumentiamo la forza del Vnodo
+    void stampStatic(Matrix& G, Vector& I) override {
         if (n_out != 0) {
             G(n_out, n_out) += g_out;
+        }
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
+        if (n_out != 0) {
             I(n_out) += current_freq * g_out; 
         }
     }

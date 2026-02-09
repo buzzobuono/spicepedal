@@ -29,8 +29,8 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
     protected:
     
-    void applySource(double dt) override {
-        NewtonRaphsonSolver::applySource(dt);
+    void applySource() override {
+        NewtonRaphsonSolver::applySource();
         
         if (circuit.output_node > 0) {
             G(circuit.output_node, circuit.output_node) += current_load_g; 
@@ -40,9 +40,9 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
     public:
     
-    ZOutSolver(Circuit& circuit, double sample_rate, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
-        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
-          signal_generator(std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude)),
+    ZOutSolver(Circuit& circuit, double dt, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance, double test_load_impedance = 1e6)
+        : NewtonRaphsonSolver(circuit, dt, max_iterations, tolerance),
+          signal_generator(std::make_unique<SinusoidGenerator>(1 / dt, input_frequency, input_duration, input_amplitude)),
             load_g(1.0 / test_load_impedance),
             current_load_g(1.0 / test_load_impedance)
     {
@@ -78,7 +78,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
             this->input_voltage = v_src;
 
-            if (runNewtonRaphson(dt)) {
+            if (runNewtonRaphson()) {
                 double v_out = 0.0;
                 if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
                     v_out = V(circuit.output_node);
@@ -91,7 +91,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
                 
                 V_open_ph += std::complex<double>(v_out, 0.0) * weight;
                 
-                updateComponentsHistory(dt);
+                updateComponentsHistory();
             }
         }
 
@@ -113,7 +113,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
 
             this->input_voltage = v_src;
             
-            if (runNewtonRaphson(dt)) {
+            if (runNewtonRaphson()) {
                 
                 double v_out = 0.0;
                 if (circuit.output_node >= 0 && static_cast<size_t>(circuit.output_node) < static_cast<size_t>(circuit.num_nodes)) {
@@ -129,7 +129,7 @@ class ZOutSolver : public NewtonRaphsonSolver {
                 V_loaded_ph += std::complex<double>(v_out, 0.0) * weight;
                 I_loaded_ph += std::complex<double>(i_load, 0.0) * weight;
                 
-                updateComponentsHistory(dt);
+                updateComponentsHistory();
             }
         }
 

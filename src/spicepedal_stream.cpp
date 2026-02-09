@@ -131,7 +131,7 @@ public:
 
         DEBUG_LOG("Hardware Sample Rate rilevato: " << sample_rate << " Hz");
         
-        solver = std::make_unique<RealTimeSolver>(circuit, sample_rate, max_iterations, tolerance);
+        solver = std::make_unique<RealTimeSolver>(circuit, (1 / sample_rate), max_iterations, tolerance);
         solver->initialize();
         
         this->ratio = sample_rate / (double)sfinfo.samplerate;

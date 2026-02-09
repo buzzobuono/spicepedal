@@ -21,10 +21,10 @@ class BehavioralComponent : public Component {
     mutable double dt_internal = 0.0;
     mutable double time_internal = 0.0;
     mutable std::map<std::string, double> params_prev_buffer;
-    
-    bool is_initialized = false;
 
-    void init_exprtk(const Eigen::VectorXd& V) {
+    double dt;
+    
+    void init_exprtk(const Vector& V) {
         v_buffer.resize(V.size(), 0.0);
         v_nodes_prev.resize(V.size(), 0.0);
         
@@ -55,10 +55,9 @@ class BehavioralComponent : public Component {
             std::cout << "[EXPRTK ERROR] " << parser.error() << " in expression: " << expression_string << std::endl;
             throw std::runtime_error("BehavioralComponent: expression syntax error");
         }
-        is_initialized = true;
     }
 
-    void sync_variables(const Eigen::VectorXd& V, double dt) {
+    void sync_variables(const Vector& V, double dt) {
         dt_internal = dt;
         for (int i = 0; i < V.size(); ++i) {
             v_buffer[i] = V(i);
@@ -67,7 +66,12 @@ class BehavioralComponent : public Component {
 
 public:
     
-    void updateHistory(const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+        this->init_exprtk(V);
+    }
+    
+    void updateHistory(const Vector& V) override {
         time_internal += dt; 
         for(int i=0; i < V.size(); ++i) {
             v_nodes_prev[i] = V(i);

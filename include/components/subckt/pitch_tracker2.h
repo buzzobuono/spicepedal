@@ -23,7 +23,8 @@ private:
     int freq_idx;
     double freq_sum;
     double smoothed_freq;
-
+    double dt = 0.0;
+    
 public:
     PitchTracker2(const std::string& name, int in, int out, double thr = 0.02, int n_signal = 8, int n_freq = 4)
         : n_in(in), n_out(out), threshold(thr), signal_n(n_signal), freq_n(n_freq)
@@ -45,7 +46,11 @@ public:
         freq_window.assign(freq_n, 0.0);
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void prepare(const Vector& V, double dt) override {
+        this->dt = dt;
+    }
+    
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
         double g_out = 1000.0;
         if (n_out != 0) {
             G(n_out, n_out) += g_out;
@@ -53,7 +58,7 @@ public:
         }
     }
     
-    void updateHistory(const Vector& V, double dt) override {
+    void updateHistory(const Vector& V) override {
         static double internal_time = 0;
         internal_time += dt;
 

@@ -26,9 +26,9 @@ class ZInSolver : public NewtonRaphsonSolver {
 
     public:
     
-    ZInSolver(Circuit& circuit, double sample_rate, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
-          signal_generator(std::make_unique<SinusoidGenerator>(sample_rate, input_frequency, input_duration, input_amplitude))
+    ZInSolver(Circuit& circuit, double dt, double input_amplitude, int input_frequency, double input_duration, int max_iterations, double tolerance)
+        : NewtonRaphsonSolver(circuit, dt, max_iterations, tolerance),
+          signal_generator(std::make_unique<SinusoidGenerator>(1 / dt, input_frequency, input_duration, input_amplitude))
     {
         signal_generator->printInfo();
         signalIn = signal_generator->generate(0);
@@ -59,7 +59,7 @@ class ZInSolver : public NewtonRaphsonSolver {
             
             this->input_voltage = v_src;
 
-            if (runNewtonRaphson(dt)) {
+            if (runNewtonRaphson()) {
                 double v_node = 0.0;
                 if (circuit.input_node >= 0 && static_cast<size_t>(circuit.input_node) < static_cast<size_t>(circuit.num_nodes)) {
                     v_node = V(circuit.input_node);
@@ -73,7 +73,7 @@ class ZInSolver : public NewtonRaphsonSolver {
                 V_ph += std::complex<double>(v_src, 0.0) * weight;
                 I_ph += std::complex<double>(i_inst, 0.0) * weight;
                 
-                updateComponentsHistory(dt);
+                updateComponentsHistory();
             }
         }
         

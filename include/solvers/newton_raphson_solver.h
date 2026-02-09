@@ -28,7 +28,7 @@ class NewtonRaphsonSolver : public Solver {
     };
     
     std::vector<FastEntry> fast_G_entries;
-    
+    std::vector<FastEntry> fast_I_entries;
     std::vector<Component*> dynamic_components;
     
     #ifdef DEBUG_MODE
@@ -43,7 +43,6 @@ class NewtonRaphsonSolver : public Solver {
     Vector V, V_new;
     Eigen::PartialPivLU<Matrix> lu_solver;
     
-    double sample_rate;
     double input_voltage;
     double source_g;
     int max_iterations;
@@ -58,8 +57,8 @@ class NewtonRaphsonSolver : public Solver {
         this->input_voltage = 0.0; 
         
         for (int i = 0; i < warmup_samples; i++) {
-            if (runNewtonRaphson(dt)) {
-                this->updateComponentsHistory(dt);
+            if (runNewtonRaphson()) {
+                this->updateComponentsHistory();
             } 
         }
         
@@ -69,18 +68,19 @@ class NewtonRaphsonSolver : public Solver {
         this->initCounters();
     }
     
-    virtual void stampComponents(double dt) {
+    virtual void stampComponents() {
         for (const auto& entry : fast_G_entries) {
             *(entry.address) += entry.value;
         }
-        
+        for (const auto& entry : fast_I_entries) {
+            *(entry.address) += entry.value;
+        }
+
         for (auto* comp : dynamic_components) {
             #ifdef DEBUG_MODE
             auto start = std::chrono::high_resolution_clock::now();
             #endif
-            
-            comp->stamp(G, I, V, dt);
-            
+            comp->stamp(G, I, V);
             #ifdef DEBUG_MODE
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -90,46 +90,29 @@ class NewtonRaphsonSolver : public Solver {
         }
     }
 
-    virtual void stampComponents__(double dt) {
-        for (auto& comp : circuit.components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            
-            comp->stamp(G, I, V, dt);
-            
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[comp->type].total_time_ns += duration;
-            stamp_stats[comp->type].calls++;
-            #endif
-        }
-    }
-    
-    virtual void applySource(double dt) {
+    virtual void applySource() {
         if (circuit.input_node > 0) {
             G(circuit.input_node, circuit.input_node) += source_g;
             I(circuit.input_node) += input_voltage * source_g;
         }
     }
     
-    virtual void updateComponentsHistory(double dt) {
+    virtual void updateComponentsHistory() {
         for (auto& comp : circuit.components) {
-            comp->updateHistory(V, dt);
+            comp->updateHistory(V);
         }
     }
-        
-    bool runNewtonRaphson(double dt) {
+    
+    bool runNewtonRaphson() {
         this->sample_count++;
         
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
             I.setZero();
             
-            this->stampComponents(dt);
+            this->stampComponents();
             
-            this->applySource(dt);
+            this->applySource();
             
             G.row(0).setZero();
             G.col(0).setZero();
@@ -164,10 +147,9 @@ class NewtonRaphsonSolver : public Solver {
     
     public:
     
-    NewtonRaphsonSolver(Circuit& circuit, double sample_rate, int max_iterations, double tolerance) 
-        : circuit(circuit), 
-          sample_rate(sample_rate),
-          dt(1.0 / sample_rate),
+    NewtonRaphsonSolver(Circuit& circuit, double dt, int max_iterations, double tolerance) 
+        : circuit(circuit),
+          dt(dt),
           max_iterations(max_iterations),
           tolerance_sq(tolerance*tolerance) {
               
@@ -184,29 +166,33 @@ class NewtonRaphsonSolver : public Solver {
         V.setZero();
         
         fast_G_entries.clear();
+        fast_I_entries.clear();
         dynamic_components.clear();
         
         for (auto& comp : circuit.components) {
-            if (comp->is_static) {
-                Matrix shadow_G(circuit.num_nodes, circuit.num_nodes);
-                Vector shadow_I(circuit.num_nodes), shadow_V(circuit.num_nodes);
-                shadow_G.setZero();
-                shadow_I.setZero();
-                shadow_V.setZero();
-                
-                comp->stamp(shadow_G, shadow_I, shadow_V, dt);
-                
-                for (int r = 0; r < circuit.num_nodes; ++r) {
-                    for (int c = 0; c < circuit.num_nodes; ++c) {
-                        if (shadow_G(r, c) != 0.0) {
-                            fast_G_entries.push_back({&G(r, c), shadow_G(r, c)});
-                        }
-                    }
+            Matrix shadow_G = Matrix::Zero(circuit.num_nodes, circuit.num_nodes);
+            Vector shadow_I = Vector::Zero(circuit.num_nodes);
+            
+            comp->prepare(V, dt);
+            comp->stampStatic(shadow_G, shadow_I);
+            
+            for (int r = 0; r < circuit.num_nodes; ++r) {
+                for (int c = 0; c < circuit.num_nodes; ++c) {
+                    if (shadow_G(r, c) != 0.0) 
+                        fast_G_entries.push_back({&G(r, c), shadow_G(r, c)});
                 }
-            } else {
+                if (shadow_I(r) != 0.0) 
+                    fast_I_entries.push_back({&I(r), shadow_I(r)});
+            }
+            
+            if (!comp->is_static) {
                 dynamic_components.push_back(comp.get());
             }
         }
+        
+        auto sortByAddr = [](const FastEntry& a, const FastEntry& b) { return a.address < b.address; };
+        std::sort(fast_G_entries.begin(), fast_G_entries.end(), sortByAddr);
+        std::sort(fast_I_entries.begin(), fast_I_entries.end(), sortByAddr);
         
         this->initCounters();
         circuit.reset();

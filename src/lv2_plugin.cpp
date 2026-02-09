@@ -39,7 +39,6 @@ typedef struct {
     const float* param5;
     Circuit* circuit;
     RealTimeSolver* solver;
-    double sample_rate;
     bool initialized;
     std::string bundle_path;
 } SpicePedalPlugin;
@@ -65,7 +64,6 @@ static LV2_Handle instantiate(
     plugin->param5 = nullptr;
     plugin->bundle_path = std::string(bundle_path);
 
-    plugin->sample_rate = sample_rate;
     plugin->initialized = false;
     
     plugin->circuit = new Circuit();
@@ -81,7 +79,7 @@ static LV2_Handle instantiate(
     try {
         plugin->solver = new RealTimeSolver(
             *plugin->circuit,
-            sample_rate,
+            (1 / sample_rate), // dt
             15,
             1e-6
         );

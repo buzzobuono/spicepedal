@@ -16,12 +16,13 @@ public:
         type = ComponentType::WIRE;
         name = comp_name;
         nodes = { n1, n2 };
+        is_static = true;
     }
     
-    void stamp(Matrix& G, Vector& I, const Vector& V, double dt) override {
+    void stampStatic(Matrix& G, Vector& I) override {
         int n1 = nodes[0], n2 = nodes[1];
         Resistor r(name , n1, n2, 1e-3);
-        r.stamp(G, I, V, dt);
+        r.stampStatic(G, I);
     }
 };
 

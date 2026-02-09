@@ -36,8 +36,8 @@ class TransientSolver : public NewtonRaphsonSolver {
     
     public:
     
-    TransientSolver(Circuit& circuit, double sample_rate, std::unique_ptr<SignalGenerator> signal_generator, double input_gain, double output_gain, std::string output_file, bool bypass, bool clipping, int max_iterations, double tolerance)
-        : NewtonRaphsonSolver(circuit, sample_rate, max_iterations, tolerance),
+    TransientSolver(Circuit& circuit, double dt, std::unique_ptr<SignalGenerator> signal_generator, double input_gain, double output_gain, std::string output_file, bool bypass, bool clipping, int max_iterations, double tolerance)
+        : NewtonRaphsonSolver(circuit, dt, max_iterations, tolerance),
           signal_generator(std::move(signal_generator)),
           input_gain(input_gain),
           output_gain(output_gain),
@@ -79,7 +79,7 @@ class TransientSolver : public NewtonRaphsonSolver {
     }
 
     bool solveImpl() override {
-        sample_rate = signal_generator->getSampleRate();
+        double sample_rate = signal_generator->getSampleRate();
         mean = signal_generator->getMean();
         maxNormalized = signal_generator->getMaxNormalized();
         scale = signal_generator->getScaleFactor();
@@ -91,12 +91,12 @@ class TransientSolver : public NewtonRaphsonSolver {
             if (!bypass) {
                 signalOut[i] = 0;
                 this->setInputVoltage(signalIn[i]);
-                bool converged = runNewtonRaphson(dt);
+                bool converged = runNewtonRaphson();
                 if (converged) {
                     lastOutput = this->getOutputVoltage();
                     signalOut[i] = lastOutput;
                     logProbes();
-                    updateComponentsHistory(dt);
+                    updateComponentsHistory();
                 } else {
                     signalOut[i] = lastOutput;
                     logProbes();
@@ -178,7 +178,7 @@ class TransientSolver : public NewtonRaphsonSolver {
                 bool found = false;
                 for (auto& comp : circuit.components) {
                     if (comp->name == p.name) {
-                        current = comp->getCurrent(V, dt);
+                        current = comp->getCurrent(V);
                         found = true;
                         break;
                     }
