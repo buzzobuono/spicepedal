@@ -5,8 +5,6 @@
 #include "circuit.h"
 #include "utils/math.h"
 
-#include <Eigen/Dense>
-
 #ifdef DEBUG_MODE
 #include <chrono>
 #include <map>
@@ -41,7 +39,7 @@ class NewtonRaphsonSolver : public Solver {
     Matrix G;
     Vector I;
     Vector V, V_new;
-    Eigen::PartialPivLU<Matrix> lu_solver;
+    PartialPivLU lu_solver;
     
     double input_voltage;
     double source_g;
