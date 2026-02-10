@@ -46,7 +46,7 @@ class Component {
         params = pr;
     }
     
-    virtual void prepare(const Vector& V, double dt) {};
+    virtual void prepare(Matrix& G, Vector& I, Vector& V, double dt) {};
 
     virtual void stampStatic(Matrix& G, Vector& I) {};
     

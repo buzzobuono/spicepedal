@@ -66,7 +66,7 @@ class BehavioralComponent : public Component {
 
 public:
     
-    void prepare(const Vector& V, double dt) override {
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
         this->dt = dt;
         this->init_exprtk(V);
     }
