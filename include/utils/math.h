@@ -190,8 +190,11 @@ struct PartialPivLU
 using Matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor, MAX_NODES, MAX_NODES>;
 using Vector = Eigen::Matrix<double, Eigen::Dynamic, 1, Eigen::ColMajor, MAX_NODES, 1>;
 using PartialPivLU = Eigen::PartialPivLU<Matrix>;
+<<<<<<< HEAD
+=======
 
 #endif
+>>>>>>> exp2
 
 // Esponenziale polinomiale di precisione (Simil-SIMD)
 // continua, derivabile e precisa su tutto il range 0-1V
