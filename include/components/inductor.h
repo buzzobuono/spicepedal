@@ -47,7 +47,7 @@ public:
         }
     }
     
-    void prepare(const Vector& V, double dt) override {
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
         this->dt = dt;
     }
     

@@ -5,4 +5,4 @@ L1 2 0 1.59 Rs=100
 
 .input 1
 .output 2
-.probe highpass-rl.csv V(1) V(2)
+.probe V(1) V(2)

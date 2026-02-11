@@ -39,7 +39,7 @@ public:
             throw std::runtime_error("MOSFET: parametri non validi");
     }
 
-    void prepare(const Vector& V, double dt) override {
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
         this->dt = dt;
     }
     

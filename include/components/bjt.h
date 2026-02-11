@@ -26,9 +26,13 @@ private:
     
     static constexpr double V_LIMIT = 0.5;  // Voltage limiting for convergence
     
+    // For PNP, flip signs
+    double sign = 1.0;
+        
 public:
     BJT(const std::string& comp_name, int collector, int base, int emitter, 
-        double bf, double br, double is, double Vt) {
+        double bf, double br, double is, double Vt)
+    {
         if (is <= 0) {
             throw std::runtime_error("BJT: Saturation current IS must be positive");
         }
@@ -44,6 +48,7 @@ public:
         this->type = ComponentType::BJT;
         name = comp_name;
         bjt_type = NPN;
+        sign = (bjt_type == PNP) ? -1.0 : 1.0;
         nc = collector;
         nb = base;
         ne = emitter;
@@ -64,27 +69,26 @@ public:
         if (BF <= 0 || IS <= 0) {
             throw std::runtime_error(std::string("BJT: BF and IS must be positive"));
         }
+            
     }
     
+    __attribute__((always_inline))
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // Read node voltages (handle ground)
-        double vc = (nc != 0) ? V(nc) : 0.0;
-        double vb = (nb != 0) ? V(nb) : 0.0;
-        double ve = (ne != 0) ? V(ne) : 0.0;
+        double vc = V(nc);
+        double vb = V(nb);
+        double ve = V(ne);
         
         // Junction voltages
         double vbe = vb - ve;
         double vbc = vb - vc;
-        
+    
         // Voltage limiting for convergence
         vbe = limitJunction(vbe, vbe_prev);
         vbc = limitJunction(vbc, vbc_prev);
         
-        // For PNP, invert polarities
-        if (bjt_type == PNP) {
-            vbe = -vbe;
-            vbc = -vbc;
-        }
+        vbe *= sign;
+        vbc *= sign;
         
         // Clamp exponentials to prevent overflow
         double exp_vbe = std::exp(std::min(vbe / VT, 80.0));
@@ -111,112 +115,77 @@ public:
         double ieq_c = ic - (gce * vbe + gcc * vbc);
         double ieq_e = ie - (-(gbe + gce) * vbe - (gbc + gcc) * vbc);
         
-        // For PNP, flip signs
-        double sign = (bjt_type == PNP) ? -1.0 : 1.0;
-        
-        // ========================================
+         // ========================================
         // STAMPING - Complete 3x3 submatrix
         // ========================================
         
         // Base-Emitter junction (BE diode contribution)
-        if (nb != 0 && ne != 0) {
-            G(nb, nb) += gbe;
-            G(nb, ne) -= gbe;
-            G(ne, nb) -= gbe;
-            G(ne, ne) += gbe;
-        } else if (nb != 0) {
-            G(nb, nb) += gbe;
-        } else if (ne != 0) {
-            G(ne, ne) += gbe;
-        }
+        G(nb, nb) += gbe;
+        G(nb, ne) -= gbe;
+        G(ne, nb) -= gbe;
+        G(ne, ne) += gbe;
         
-        // Base-Collector junction (BC diode contribution)
-        if (nb != 0 && nc != 0) {
-            G(nb, nb) += gbc;
-            G(nb, nc) -= gbc;
-            G(nc, nb) -= gbc;
-            G(nc, nc) += gbc;
-        } else if (nb != 0) {
-            G(nb, nb) += gbc;
-        } else if (nc != 0) {
-            G(nc, nc) += gbc;
-        }
+        // Parte BC
+        G(nb, nb) += gbc;
+        G(nb, nc) -= gbc;
+        G(nc, nb) -= gbc;
+        G(nc, nc) += gbc;
         
-        // Collector-Emitter controlled source (transistor action)
-        if (nc != 0 && ne != 0) {
-            G(nc, nb) += gce;
-            G(nc, ne) -= gce;
-            G(ne, nb) -= gce;
-            G(ne, ne) += gce;
-            
-            G(nc, nb) += gcc;
-            G(nc, nc) -= gcc;
-            G(ne, nb) -= gcc;
-            G(ne, nc) += gcc;
-        } else if (nc != 0) {
-            G(nc, nb) += gce + gcc;
-            G(nc, nc) -= gcc;
-        } else if (ne != 0) {
-            G(ne, nb) -= gce + gcc;
-            G(ne, nc) += gcc;
-        }
+        // Transistor action (Controlled sources)
+        G(nc, nb) += gce + gcc;
+        G(nc, ne) -= gce;
+        G(nc, nc) -= gcc;
         
-        // Current sources (equivalent sources from companion model)
-        if (nb != 0) I(nb) -= sign * ieq_b;
-        if (nc != 0) I(nc) -= sign * ieq_c;
-        if (ne != 0) I(ne) -= sign * ieq_e;
-                   
-                   // Stabilizzazione diagonale per evitare nodi flottanti (G_MIN)
-        if (nc != 0) G(nc, nc) += G_MIN_STABILITY;
-        if (nb != 0) G(nb, nb) += G_MIN_STABILITY;
-        if (ne != 0) G(ne, ne) += G_MIN_STABILITY;
-
+        G(ne, nb) -= (gce + gcc);
+        G(ne, ne) += gce;
+        G(ne, nc) += gcc;
+        
+        // Vettore delle correnti
+        I(nb) -= sign * ieq_b;
+        I(nc) -= sign * ieq_c;
+        I(ne) -= sign * ieq_e;
+        
+        // Stabilizzazione diagonale (G_MIN)
+        G(nc, nc) += G_MIN_STABILITY;
+        G(nb, nb) += G_MIN_STABILITY;
+        G(ne, ne) += G_MIN_STABILITY;
     }
     
+    __attribute__((always_inline))
     void updateHistory(const Vector& V) override {
-        // For BJT, history is updated during stamp
-        // But we can update vbe_prev, vbc_prev here for clarity
-        double vc = (nc != 0) ? V(nc) : 0.0;
-        double vb = (nb != 0) ? V(nb) : 0.0;
-        double ve = (ne != 0) ? V(ne) : 0.0;
+        // Lettura diretta: se un nodo è 0, V(0) restituisce correttamente 0.0
+        double vc = V(nc);
+        double vb = V(nb);
+        double ve = V(ne);
         
-        vbe_prev = vb - ve;
-        vbc_prev = vb - vc;
-        
-        if (bjt_type == PNP) {
-            vbe_prev = -vbe_prev;
-            vbc_prev = -vbc_prev;
-        }
+        // Calcoliamo le tensioni di giunzione correnti (già pesate dal segno per NPN/PNP)
+        vbe_prev = sign * (vb - ve);
+        vbc_prev = sign * (vb - vc);
     }
     
     double getCurrent(const Vector& V) const override {
-        // Leggi tensioni attuali
-        double vc = (nc != 0) ? V(nc) : 0.0;
-        double vb = (nb != 0) ? V(nb) : 0.0;
-        double ve = (ne != 0) ? V(ne) : 0.0;
+        // Lettura tensioni senza branching
+        double vc = V(nc);
+        double vb = V(nb);
+        double ve = V(ne);
         
-        double vbe = vb - ve;
-        double vbc = vb - vc;
+        // Tensioni di giunzione (normalizzate dal segno)
+        double vbe = sign * (vb - ve);
+        double vbc = sign * (vb - vc);
         
-        // Per PNP, invertiamo le polarità per usare le stesse formule
-        if (bjt_type == PNP) {
-            vbe = -vbe;
-            vbc = -vbc;
-        }
-
-        // Correnti dei diodi interni (Senza limitJunction qui, vogliamo il valore reale)
+        // Correnti dei diodi interni (usiamo min per sicurezza numerica contro overflow)
         double exp_vbe = std::exp(std::min(vbe / VT, 80.0));
         double exp_vbc = std::exp(std::min(vbc / VT, 80.0));
         
-        double if_diode = IS * (exp_vbe - 1.0); 
+        double if_diode = IS * (exp_vbe - 1.0);
         double ir_diode = IS * (exp_vbc - 1.0);
         
-        // Corrente di Collettore (Ic)
-        // Ic = If - Ir - (Ir/BR) -> Versione completa Ebers-Moll
-        double ic = if_diode - ir_diode * (1.0 + 1.0/BR);
+        // Corrente di Collettore (Ic) secondo il modello Ebers-Moll
+        // Ic = If - Ir - (Ir/BR)
+        double ic = if_diode - ir_diode * (1.0 + 1.0 / BR);
         
-        // Se il tipo è PNP, la corrente fisica esce dal collettore (segno invertito)
-        return (bjt_type == PNP) ? -ic : ic;
+        // Se PNP, la corrente fisica è uscente dal collettore, quindi invertiamo il segno
+        return sign * ic;
     }
     
     void reset() override {

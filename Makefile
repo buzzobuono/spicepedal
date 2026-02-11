@@ -3,6 +3,7 @@ DESTDIR ?=
 BINDIR = $(PREFIX)/bin
 FAST_MATH ?= 1
 DEBUG ?= 0
+BACKEND ?= EIGEN3
 
 CXX ?= g++
 CXXFLAGS += -std=c++17 -O3 -march=native -flto -funroll-loops -fno-math-errno -fno-trapping-math #-Wall -Wextra -fsanitize=address
@@ -17,13 +18,22 @@ else
     CXXFLAGS += -DNDEBUG -DEIGEN_NO_DEBUG 
 endif
 
+ifeq ($(BACKEND), EIGEN3)
+    ifeq ($(origin TERMUX__PREFIX), environment)
+        INCLUDES += -I$(TERMUX__PREFIX)/include/eigen3
+    else
+        INCLUDES += -I/usr/include/eigen3
+    endif
+endif
+
+ifeq ($(BACKEND), INTERNAL)
+    CXXFLAGS += -DBACKEND_INTERNAL
+endif
+
 INCLUDES = -Iinclude
 
 ifeq ($(origin TERMUX__PREFIX), environment)
     CXXFLAGS += --rtlib=compiler-rt
-    INCLUDES += -I$(TERMUX__PREFIX)/include/eigen3
-else
-    INCLUDES += -I/usr/include/eigen3
 endif
 
 LIBS_SNDFILE = -lsndfile 

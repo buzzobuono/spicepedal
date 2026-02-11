@@ -29,7 +29,7 @@ public:
     ~FFTPitchTracker() {
     }
 
-    void prepare(const Vector& V, double dt) override {
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
         sample_rate = 1.0 / dt;
     }
     

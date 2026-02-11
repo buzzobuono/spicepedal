@@ -28,6 +28,8 @@ class NewtonRaphsonSolver : public Solver {
     std::vector<FastEntry> fast_G_entries;
     std::vector<FastEntry> fast_I_entries;
     std::vector<Component*> dynamic_components;
+    std::vector<BJT*> bjt_components;
+    std::vector<Capacitor*> cap_components;
     
     #ifdef DEBUG_MODE
     std::map<ComponentType, ProfileData> stamp_stats;
@@ -74,6 +76,38 @@ class NewtonRaphsonSolver : public Solver {
             *(entry.address) += entry.value;
         }
 
+        for (auto* bjt : bjt_components) {
+            #ifdef DEBUG_MODE
+            auto start = std::chrono::high_resolution_clock::now();
+            #endif
+            
+            // Chiamata statica: il compilatore sa che è un BJT
+            bjt->BJT::stamp(G, I, V); 
+            
+            #ifdef DEBUG_MODE
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            stamp_stats[bjt->type].total_time_ns += duration;
+            stamp_stats[bjt->type].calls++;
+            #endif
+        }
+        
+        for (auto* cap : cap_components) {
+            #ifdef DEBUG_MODE
+            auto start = std::chrono::high_resolution_clock::now();
+            #endif
+            
+            // Chiamata statica: il compilatore sa che è un BJT
+            cap->Capacitor::stamp(G, I, V); 
+            
+            #ifdef DEBUG_MODE
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            stamp_stats[cap->type].total_time_ns += duration;
+            stamp_stats[cap->type].calls++;
+            #endif
+        }
+        
         for (auto* comp : dynamic_components) {
             #ifdef DEBUG_MODE
             auto start = std::chrono::high_resolution_clock::now();
@@ -171,7 +205,7 @@ class NewtonRaphsonSolver : public Solver {
             Matrix shadow_G = Matrix::Zero(circuit.num_nodes, circuit.num_nodes);
             Vector shadow_I = Vector::Zero(circuit.num_nodes);
             
-            comp->prepare(V, dt);
+            comp->prepare(G, I, V, dt);
             comp->stampStatic(shadow_G, shadow_I);
             
             for (int r = 0; r < circuit.num_nodes; ++r) {
@@ -184,7 +218,13 @@ class NewtonRaphsonSolver : public Solver {
             }
             
             if (!comp->is_static) {
-                dynamic_components.push_back(comp.get());
+                if (comp->type == ComponentType::BJT) {
+                    bjt_components.push_back(static_cast<BJT*>(comp.get()));
+                } else if (comp->type == ComponentType::CAPACITOR) {
+                    cap_components.push_back(static_cast<Capacitor*>(comp.get()));
+                } else {
+                    dynamic_components.push_back(comp.get());
+                }
             }
         }
         
