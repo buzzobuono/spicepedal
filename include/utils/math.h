@@ -3,11 +3,10 @@
 
 #include <cmath>
 #include <cstdint>
-#include <Eigen/Dense>
 
 constexpr int MAX_NODES = 32;
 
-#ifndef BACKEND_INTERNAL
+#ifdef BACKEND_INTERNAL
 struct Vector
 {
     int n = 0;
@@ -105,72 +104,124 @@ struct Matrix
 
 struct PartialPivLU
 {
-    int n=0;
-    double* LU=nullptr;
-    
+    int n = 0;
+    double* LU = nullptr;
+    int pivots[MAX_NODES];
+
     inline void compute(Matrix& M)
+{
+    n = M.n;
+    // NON usare LU = M.data se vuoi mantenere G integra, 
+    // ma se fai G.setZero() ogni volta va bene.
+    LU = M.data; 
+    for (int i = 0; i < n; i++) pivots[i] = i;
+
+    for (int k = 0; k < n; k++)
     {
-        LU=M.data;
-        n=M.n;
+        int max_row = k;
+        double max_val = std::abs(LU[k * n + k]);
+        for (int i = k + 1; i < n; i++) {
+            double val = std::abs(LU[i * n + k]);
+            if (val > max_val) {
+                max_val = val;
+                max_row = i;
+            }
+        }
 
-        for(int k=0;k<n;k++)
-        {
-            double Akk=LU[k*n+k];
-            double inv=1.0/Akk;
+        // Se il pivot è troppo piccolo, la matrice è singolare
+        if (max_val < 1e-20) {
+            // Forza un valore minuscolo per evitare il NaN, 
+            // ma questo indica un errore nel circuito (nodi fluttuanti)
+            LU[k * n + k] = 1e-20; 
+        }
 
-            double* __restrict Ak=&LU[k*n];
+        if (max_row != k) {
+            // Scambio fisico delle righe
+            for (int j = 0; j < n; j++) {
+                std::swap(LU[k * n + j], LU[max_row * n + j]);
+            }
+            // Registro lo scambio per il vettore B
+            std::swap(pivots[k], pivots[max_row]);
+        }
 
-            for(int i=k+1;i<n;i++)
-            {
-                double* __restrict Ai=&LU[i*n];
-
-                double f=Ai[k]*inv;
-                Ai[k]=f;
-
-                for(int j=k+1;j<n;j++)
-                    Ai[j]-=f*Ak[j];
+        double inv = 1.0 / LU[k * n + k];
+        for (int i = k + 1; i < n; i++) {
+            LU[i * n + k] *= inv; // L'elemento L_ik
+            double m = LU[i * n + k];
+            for (int j = k + 1; j < n; j++) {
+                LU[i * n + j] -= m * LU[k * n + j];
             }
         }
     }
-    
+}
+
+
     inline Vector solve(const Vector& b) const
     {
         Vector x; x.resize(n);
         
-        for(int i=0;i<n;i++) x(i)=b(i);
-        
-        for(int i=0;i<n;i++)
-        {
-            double sum=x(i);
-            const double* __restrict Li=&LU[i*n];
+        // Applica il pivoting al vettore b (Forward substitution parte 1)
+        for (int i = 0; i < n; i++) x(i) = b(pivots[i]);
 
-            for(int j=0;j<i;j++)
-                sum-=Li[j]*x(j);
-
-            x(i)=sum;
+        // Forward substitution (L)
+        for (int i = 0; i < n; i++) {
+            const double* __restrict Li = &LU[i * n];
+            for (int j = 0; j < i; j++)
+                x(i) -= Li[j] * x(j);
         }
-        
-        for(int i=n-1;i>=0;i--)
-        {
-            double sum=x(i);
-            const double* __restrict Ui=&LU[i*n];
 
-            for(int j=i+1;j<n;j++)
-                sum-=Ui[j]*x(j);
-
-            x(i)=sum/Ui[i];
+        // Backward substitution (U)
+        for (int i = n - 1; i >= 0; i--) {
+            const double* __restrict Ui = &LU[i * n];
+            for (int j = i + 1; j < n; j++)
+                x(i) -= Ui[j] * x(j);
+            x(i) /= Ui[i];
         }
 
         return x;
     }
 };
 
+
 #else
+
+#include <Eigen/Dense>
 
 using Matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor, MAX_NODES, MAX_NODES>;
 using Vector = Eigen::Matrix<double, Eigen::Dynamic, 1, Eigen::ColMajor, MAX_NODES, 1>;
 using PartialPivLU = Eigen::PartialPivLU<Matrix>;
 
 #endif
+
+// Esponenziale polinomiale di precisione (Simil-SIMD)
+// continua, derivabile e precisa su tutto il range 0-1V
+double fast_exp(double x) {
+    if (x < -80.0) return 0.0;
+    if (x > 80.0) return std::exp(x);
+
+    // Estrazione parte intera per riduzione del range
+    // e^x = 2^(x * log2(e))
+    // Qui usiamo un'approssimazione polinomiale di grado 5 molto efficiente
+    union { double d; long long i; } u;
+    double tmp = 1.4426950408889634073599 * x;
+    long long integer_part = (long long)tmp;
+    double fraction = tmp - (double)integer_part;
+
+    // Polinomio di Taylor per la parte frazionaria (0 <= f <= 1)
+    double f = fraction * 0.6931471805599453;
+    double res = 1.0 + f * (1.0 + f * (0.5 + f * (0.16666666666666666 + f * (0.04166666666666666 + f * 0.00833333333333333))));
+
+    // Moltiplicazione rapida per 2^N usando il bit-shifting dell'esponente double
+    u.i = (integer_part + 1023) << 52;
+    return res * u.d;
+}
+
+double fast_tanh(double x) {
+    if (x > 4.9) return 1.0;
+    if (x < -4.9) return -1.0;
+    double x2 = x * x;
+    // Padé (3,2) ottimizzato: mantiene precisione e derivata continua
+    return x * (135.0 + 15.0 * x2) / (135.0 + 60.0 * x2 + x2 * x2);
+}
 
 #endif

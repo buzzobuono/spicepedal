@@ -35,9 +35,6 @@
 #include "components/subckt/fft_pitch_tracker.h"
 #include "components/subckt/integrator.h"
 
-#include <Eigen/Dense>
-#include <Eigen/LU>
-
 struct ProbeTarget {
     enum class Type { VOLTAGE, CURRENT };
     Type type;
