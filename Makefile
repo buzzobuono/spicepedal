@@ -4,7 +4,7 @@ BINDIR = $(PREFIX)/bin
 
 FAST_MATH ?= 1
 DEBUG ?= 0
-BACKEND ?= EIGEN3
+BACKEND ?= INTERNAL
 
 CXX ?= g++
 
@@ -44,7 +44,6 @@ bin/spicepedal: src/spicepedal.cpp | bin
 bin/spicepedal-stream: LDLIBS += $(shell pkg-config --libs portaudio-2.0 sndfile samplerate)
 bin/spicepedal-stream: CPPFLAGS += $(shell pkg-config --cflags portaudio-2.0 sndfile samplerate)
 bin/spicepedal-stream: src/spicepedal_stream.cpp | bin
-	#	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal_stream.cpp -o bin/spicepedal-stream $(LIBS_SNDFILE) $(LIBS_SAMPLERATE) $(LIBS_PORTAUDIO)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
 bin/spicepedal-jack: LDLIBS += $(shell pkg-config --libs jack sndfile samplerate)
