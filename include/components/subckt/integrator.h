@@ -17,7 +17,6 @@ public:
         : n_in(in), n_out(out), Rout(rout) 
     {
         name = comp_name;
-        nodes = {n_in, n_out};
         type = ComponentType::SUBCIRCUIT;
     }
 

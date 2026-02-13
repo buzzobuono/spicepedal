@@ -28,7 +28,9 @@ private:
     
     // For PNP, flip signs
     double sign = 1.0;
-        
+    
+    double inv_VT, inv_BF_VT, inv_BR_VT, IS_inv_VT, IS_inv_BF_VT, IS_inv_BR_VT;
+    
 public:
     BJT(const std::string& comp_name, int collector, int base, int emitter, 
         double bf, double br, double is, double Vt)
@@ -45,14 +47,16 @@ public:
         if (Vt <= 0) {
             throw std::runtime_error("BJT: Thermal voltage VT must be positive");
         }
+        if (collector == base || base == emitter || collector == emitter) {
+            throw std::runtime_error(std::string("BJT: All three nodes must be different"));
+        }
         this->type = ComponentType::BJT;
         name = comp_name;
         bjt_type = NPN;
-        sign = (bjt_type == PNP) ? -1.0 : 1.0;
+        
         nc = collector;
         nb = base;
         ne = emitter;
-        nodes = {nc, nb, ne};
         
         IS = is;
         BF = bf;
@@ -62,15 +66,16 @@ public:
         vbe_prev = 0.0;
         vbc_prev = 0.0;
         
-        // Validation
-        if (nc == nb || nb == ne || nc == ne) {
-            throw std::runtime_error(std::string("BJT: All three nodes must be different"));
-        }
-        if (BF <= 0 || IS <= 0) {
-            throw std::runtime_error(std::string("BJT: BF and IS must be positive"));
-        }
-            
+        sign = (bjt_type == PNP) ? -1.0 : 1.0;
+       
+        inv_VT = 1.0 / VT;
+        inv_BF_VT = 1.0 / (BF * VT);
+        inv_BR_VT = 1.0 / (BR * VT);
+        IS_inv_VT = IS * inv_VT;
+        IS_inv_BF_VT = IS * inv_BF_VT;
+        IS_inv_BR_VT = IS * inv_BR_VT;
     }
+    
     
     __attribute__((always_inline))
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
@@ -104,10 +109,10 @@ public:
         double ie = -(ib + ic);
         
         // Conductances (derivatives for linearization - Jacobian)
-        double gbe = (IS / (BF * VT)) * exp_vbe;  // ∂ib/∂vbe
-        double gbc = (IS / (BR * VT)) * exp_vbc;  // ∂ib/∂vbc
-        double gce = (IS / VT) * exp_vbe;         // ∂ic/∂vbe
-        double gcc = -(IS / VT) * exp_vbc;        // ∂ic/∂vbc
+        double gbe = (IS_inv_BF_VT) * exp_vbe;  // ∂ib/∂vbe
+        double gbc = (IS_inv_BR_VT) * exp_vbc;  // ∂ib/∂vbc
+        double gce = (IS_inv_VT) * exp_vbe;         // ∂ic/∂vbe
+        double gcc = -(IS_inv_VT) * exp_vbc;        // ∂ic/∂vbc
         
         // Equivalent current sources (companion model)
         // i = g*v + ieq  =>  ieq = i - g*v
@@ -118,37 +123,20 @@ public:
          // ========================================
         // STAMPING - Complete 3x3 submatrix
         // ========================================
-        
-        // Base-Emitter junction (BE diode contribution)
-        G(nb, nb) += gbe;
-        G(nb, ne) -= gbe;
-        G(ne, nb) -= gbe;
-        G(ne, ne) += gbe;
-        
-        // Parte BC
-        G(nb, nb) += gbc;
-        G(nb, nc) -= gbc;
-        G(nc, nb) -= gbc;
-        G(nc, nc) += gbc;
-        
-        // Transistor action (Controlled sources)
-        G(nc, nb) += gce + gcc;
-        G(nc, ne) -= gce;
-        G(nc, nc) -= gcc;
-        
-        G(ne, nb) -= (gce + gcc);
-        G(ne, ne) += gce;
+        G(nb, nb) += gbe + gbc + G_MIN_STABILITY;
+        G(nb, ne) += -gbe;
+        G(ne, nb) += (-gbe - (gce + gcc));
+        G(ne, ne) += gbe + gce + G_MIN_STABILITY;
+        G(nb, nc) += -gbc;
+        G(nc, nb) += (gce + gcc - gbc);
+        G(nc, nc) += (gbc - gcc) + G_MIN_STABILITY;
+        G(nc, ne) += -gce;
         G(ne, nc) += gcc;
         
         // Vettore delle correnti
         I(nb) -= sign * ieq_b;
         I(nc) -= sign * ieq_c;
         I(ne) -= sign * ieq_e;
-        
-        // Stabilizzazione diagonale (G_MIN)
-        G(nc, nc) += G_MIN_STABILITY;
-        G(nb, nb) += G_MIN_STABILITY;
-        G(ne, ne) += G_MIN_STABILITY;
     }
     
     __attribute__((always_inline))

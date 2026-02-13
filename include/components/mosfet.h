@@ -30,7 +30,6 @@ public:
         name = comp_name;
         type = t;
         nd = drain; ng = gate; ns = source;
-        nodes = {nd, ng, ns};
 
         K = K_; Vth = Vth_; lambda = lambda_;
         Cgs = Cgs_; Cgd = Cgd_;

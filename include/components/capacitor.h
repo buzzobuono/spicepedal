@@ -10,8 +10,9 @@ class Capacitor : public Component {
     double C;
     double v_prev;   // tensione al passo precedente
     double i_prev;   // corrente equivalente al passo precedente
-    double _geq;
-    
+    double geq;
+    double ieq;
+    int n1, n2;
 public:
     Capacitor(const std::string& comp_name, int node1, int node2, double capacitance) {
         if (capacitance <= 0) {
@@ -22,7 +23,8 @@ public:
         }
         type = ComponentType::CAPACITOR;
         name = comp_name;
-        nodes = { node1, node2 };
+        n1 = node1;
+        n2 = node2;
         C = capacitance;
         v_prev = 0.0;
         i_prev = 0.0;
@@ -30,34 +32,35 @@ public:
 
     void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
         if (dt > 0.0) {
-            _geq = 2.0 * C / dt;
+            geq = 2.0 * C / dt;
         } else {
-            _geq = 0.0; // Caso DC
+            geq = 0.0; // Caso DC
         }
     }
     
     void stampStatic(Matrix& G, Vector& I) override {
-        int n1 = nodes[0], n2 = nodes[1];
-        G(n1, n1) += _geq;
-        G(n1, n2) -= _geq;
-        G(n2, n2) += _geq;
-        G(n2, n1) -= _geq;
+        G(n1, n1) += geq;
+        G(n1, n2) -= geq;
+        G(n2, n2) += geq;
+        G(n2, n1) -= geq;
     }
     
+    void prepareTimeStep() {
+        ieq = geq * v_prev + i_prev;
+    }
+
     __attribute__((always_inline))
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        double ieq = _geq * v_prev + i_prev;
-        int n1 = nodes[0], n2 = nodes[1];
         I(n1) += ieq;
         I(n2) -= ieq;
     }
     
     __attribute__((always_inline))
     void updateHistory(const Vector& V) override {
-        double v_n1 = V(nodes[0]);
-        double v_n2 = V(nodes[1]);
+        double v_n1 = V(n1);
+        double v_n2 = V(n2);
         double v = v_n1 - v_n2;
-        i_prev = _geq * (v - v_prev) - i_prev;
+        i_prev = geq * (v - v_prev) - i_prev;
         v_prev = v;
     }
 
@@ -67,16 +70,10 @@ public:
     }
 
     double getCurrent(const Vector& V) const override {
-        if (_geq <= 0.0) {
-            return 0.0;
-        }
-
-        double v_n1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
-        double v_n2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double v_n1 = V(n1);
+        double v_n2 = V(n2);
         double v_now = v_n1 - v_n2;
-
-        double current = _geq * (v_now - v_prev) - i_prev;
-
+        double current = geq * (v_now - v_prev) - i_prev;
         return current;
     }
     

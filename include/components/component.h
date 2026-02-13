@@ -2,7 +2,6 @@
 #define COMPONENT_H
 
 #include <string>
-#include <vector>
 
 #include "utils/math.h"
 
@@ -38,7 +37,6 @@ class Component {
     bool is_static = false;
     
     std::string name;
-    std::vector<int> nodes;
     
     virtual ~Component() = default;
     

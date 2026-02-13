@@ -9,41 +9,34 @@
 
 class Resistor : public Component {
 private:
-    
     double _r;
-
+    int n1, n2;
+    
 public:
-    Resistor(const std::string& comp_name, int n1, int n2, double r) {
+    Resistor(const std::string& comp_name, int node1, int node2, double r) {
         if (r <= 0) throw std::runtime_error("Resistance must be positive");
-        if (n1 == n2) throw std::runtime_error("Resistor nodes must be different");
+        if (node1 == node2) throw std::runtime_error("Resistor nodes must be different");
 
         type = ComponentType::RESISTOR;
         name = comp_name;
-        nodes = { n1, n2 };
+        n1 = node1;
+        n2 = node2;
         _r = r;
         is_static = true;
     }
     
     void stampStatic(Matrix& G, Vector& I) override {
         if (_r > R_MAX) return;
-
         double g = 1.0 / std::max(_r, R_MIN);
-        int n1 = nodes[0], n2 = nodes[1];
-
-        if (n1 != 0) {
-            G(n1, n1) += g;
-            if (n2 != 0) G(n1, n2) -= g;
-        }
-        if (n2 != 0) {
-            G(n2, n2) += g;
-            if (n1 != 0) G(n2, n1) -= g;
-        }
-        
+        G(n1, n1) += g;
+        G(n1, n2) -= g;
+        G(n2, n2) += g;
+        G(n2, n1) -= g;
     }
     
     double getCurrent(const Vector& V) const override {
-        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
-        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double v1 = V(n1);
+        double v2 = V(n2);
         // Legge di Ohm: I = V/R
         return (v1 - v2) / std::max(_r, R_MIN);
     }

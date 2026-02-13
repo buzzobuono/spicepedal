@@ -9,48 +9,34 @@
 
 class VoltageSource : public Component {
     
-public:
-
-    double voltage;
+    private:
+    int n1, n2;
     
-    double rs; 
-
+    public:
     double g;
+    double Ieq;
     
     VoltageSource(const std::string& nm, int np, int nn, double v, double Rs) {
         type = ComponentType::VOLTAGE_SOURCE;
         name = nm;
-        nodes = {np, nn};
-        voltage = v;
-        rs = Rs;
-        g = 1.0 / rs;
+        n1 = np;
+        n2 = nn;
+        
+        g = 1.0 / Rs;
+        Ieq = v * g;
+        
+        is_static = true;
     }
     
     void stampStatic(Matrix& G, Vector& I) override {
-        int n1 = nodes[0], n2 = nodes[1];
-        
-        if (n1 != 0) {
-            G(n1, n1) += g;
-            if (n2 != 0) G(n1, n2) -= g;
-        }
-        
-        if (n2 != 0) {
-            G(n2, n2) += g;
-            if (n1 != 0) G(n2, n1) -= g;
-        }
+        G(n1, n1) += g;
+        G(n1, n2) -= g;
+        I(n1) += Ieq;
+        G(n2, n2) += g;
+        G(n2, n1) -= g;
+        I(n2) -= Ieq;
     }
     
-    void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        int n1 = nodes[0], n2 = nodes[1];
-        
-        if (n1 != 0) {
-            I(n1) += voltage * g;
-        }
-        
-        if (n2 != 0) {
-            I(n2) -= voltage * g;
-        }
-    }
 };
 
 #endif

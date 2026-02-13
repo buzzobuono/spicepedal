@@ -27,7 +27,6 @@ public:
     {
         name = comp_name;
         type = ComponentType::VCVS; // Assicurati che VCVS sia nell'enum ComponentType
-        nodes = {n_out_p, n_out_m, n_ctrl_p, n_ctrl_m};
     }
 
     void stamp(Matrix& G, Vector& I, const Vector& V) override {

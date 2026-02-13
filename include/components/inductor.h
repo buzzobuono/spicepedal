@@ -33,7 +33,6 @@ public:
         name = comp_name;
         n1 = node_pos;
         n2 = node_neg;
-        nodes = {n1, n2};
         
         L = inductance;
         R_dc = dc_resistance;

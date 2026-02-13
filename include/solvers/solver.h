@@ -50,7 +50,7 @@ public:
         return sample_count;
     }
 
-        double getMeanIterations() {
+    double getMeanIterations() {
         return (sample_count > 0) ? (1.0 * iteration_count / sample_count) : 0.0;
     }
     

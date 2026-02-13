@@ -23,7 +23,6 @@ public:
         : n_in(in), n_out(out), threshold(thr), alpha(smooth) 
     {
         this->name = name;
-        nodes = {n_in, n_out};
         type = ComponentType::SUBCIRCUIT;
         last_cross_t = 0.0;
         current_freq = 0.0;

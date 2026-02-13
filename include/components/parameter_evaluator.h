@@ -11,7 +11,6 @@ public:
         name = comp_name;
         expression_string = expr;
         type = ComponentType::PARAMETER_EVALUATOR;
-        nodes = {}; 
     }
 
     void stamp(Matrix& G, Vector& I, const Vector& V) override {

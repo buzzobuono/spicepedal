@@ -21,7 +21,6 @@ public:
             name = comp_name;
             expression_string = expr_string;
             type = ComponentType::BEHAVIORAL_VOLTAGE_SOURCE;
-            nodes = {n_p, n_m};
             g_out = 1.0 / Rout;
     }
 

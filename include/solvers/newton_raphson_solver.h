@@ -138,6 +138,10 @@ class NewtonRaphsonSolver : public Solver {
     bool runNewtonRaphson() {
         this->sample_count++;
         
+        for (auto* cap : cap_components) {
+            cap->Capacitor::prepareTimeStep();
+        }
+        
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
             I.setZero();
@@ -183,9 +187,9 @@ class NewtonRaphsonSolver : public Solver {
         : circuit(circuit),
           dt(dt),
           max_iterations(max_iterations),
-          tolerance_sq(tolerance*tolerance) {
-              
-              source_g = 1.0 / circuit.source_impedance;
+          tolerance_sq(tolerance*tolerance)
+    {
+        source_g = 1.0 / circuit.source_impedance;
     }
     
     virtual ~NewtonRaphsonSolver() = default;

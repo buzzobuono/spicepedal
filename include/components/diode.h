@@ -29,6 +29,8 @@ private:
     double vd_prev = 0.0;
     double dt = 0.0;
 
+    int n1, n2;
+    
 public:
     Diode(const std::string& comp_name, int nn, int np,
                   double Is,
@@ -43,7 +45,8 @@ public:
             throw std::runtime_error("Diode: parametri non validi");
         }
         name = comp_name;
-        nodes = { nn, np };
+        n1 = nn;
+        n2 = np;
         _Is = Is;
         _n = n;
         _Vt = Vt;
@@ -57,7 +60,7 @@ public:
     }
     
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        double vd = V(nodes[0]) - V(nodes[1]);
+        double vd = V(n1) - V(n2);
         vd = std::clamp(vd, -5.0, 1.0);
         
         // --- DC PART (identica a versione minimal) ---
@@ -67,9 +70,7 @@ public:
         double id = _Is * (exp_term - 1.0);
         double gd = (_Is / Vt) * exp_term;
         double ieq = id - gd * vd;
-
-        int n1 = nodes[0], n2 = nodes[1];
-
+        
         if (n1 != 0) {
             G(n1, n1) += gd;
             if (n2 != 0) G(n1, n2) -= gd;
@@ -116,14 +117,14 @@ public:
     }
     
    void updateHistory(const Vector& V) override {
-        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
-        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double v1 = V(n1);
+        double v2 = V(n2);
         vd_prev = v1 - v2;
     }
     
     double getCurrent(const Vector& V) const override {
-        double v1 = (nodes[0] != 0) ? V(nodes[0]) : 0.0;
-        double v2 = (nodes[1] != 0) ? V(nodes[1]) : 0.0;
+        double v1 = V(n1);
+        double v2 = V(n2);
         double vd = v1 - v2;
 
         // 1. Parte Resistiva (Shockley Equation)

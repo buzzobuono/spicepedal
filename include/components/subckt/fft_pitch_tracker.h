@@ -21,7 +21,6 @@ public:
     FFTPitchTracker(const std::string& name, int in, int out, int size = 8192) 
         : n_in(in), n_out(out), buffer_size(size) {
         this->name = name;
-        nodes = {n_in, n_out};
         type = ComponentType::SUBCIRCUIT;
         buffer.resize(buffer_size, 0.0);
         }

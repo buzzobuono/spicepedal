@@ -41,8 +41,7 @@ public:
     {
         type = ComponentType::OPAMP;
         name = comp_name;
-        nodes = {n_out, n_plus, n_minus, n_vcc, n_vee};
-
+        
         if (Rout <= 0) throw std::runtime_error("OpAmp " + name + ": Rout must be > 0");
         if (Imax <= 0) throw std::runtime_error("OpAmp " + name + ": Imax must be > 0");
         if (Gain <= 0) throw std::runtime_error("OpAmp " + name + ": Gain must be > 0");

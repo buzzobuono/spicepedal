@@ -25,27 +25,22 @@ private:
     double _r_total;
     TaperType _taper;
     std::string _param;
+    int n1, n2, nw;
     
     void stampInternalResistor(Matrix& G, int nA, int nB, double res) {
         if (nA == nB || res > R_MAX) return;
-
         double g = 1.0 / std::max(res, R_MIN_SAFE);
-
-        if (nA != 0) {
-            G(nA, nA) += g;
-            if (nB != 0) G(nA, nB) -= g;
-        }
-        if (nB != 0) {
-            G(nB, nB) += g;
-            if (nA != 0) G(nB, nA) -= g;
-        }
+        G(nA, nA) += g;
+        G(nA, nB) -= g;
+        G(nB, nB) += g;
+        G(nB, nA) -= g;
     }
     
     double getTaperedPosition() const {
         double pos = params->get(_param);
         
         pos = std::clamp(pos, 0.0, 1.0);
-
+        
         switch (_taper)
         {
             case TaperType::LOGARITHMIC:
@@ -61,7 +56,7 @@ private:
 
 public:
     Potentiometer(const std::string &comp_name,
-                  int n1, int n2, int nw,
+                  int node1, int node2, int nodew,
                   double r_total,
                   TaperType taper,
                   const std::string &param_name) // Passaggio per reference
@@ -72,7 +67,9 @@ public:
         
         this->type = ComponentType::POTENTIOMETER;
         this->name = comp_name;
-        this->nodes = {n1, n2, nw};
+        n1 = node1;
+        n2 = node2;
+        nw = nodew;
     }
 
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
@@ -82,14 +79,12 @@ public:
         double r1_val = std::max(_r_total * (1.0 - taperedPos), R_MIN_SAFE);
         double r2_val = std::max(_r_total * taperedPos, R_MIN_SAFE);
 
-        int n1 = nodes[0], n2 = nodes[1], nw = nodes[2];
-
         stampInternalResistor(G, n1, nw, r1_val);
         stampInternalResistor(G, n2, nw, r2_val);
         
-        if (n1 != 0) G(n1, n1) += G_MIN_STABILITY;
-        if (n2 != 0) G(n2, n2) += G_MIN_STABILITY;
-        if (nw != 0) G(nw, nw) += G_MIN_STABILITY;
+        G(n1, n1) += G_MIN_STABILITY;
+        G(n2, n2) += G_MIN_STABILITY;
+        G(nw, nw) += G_MIN_STABILITY;
         
     }
 };
