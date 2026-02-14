@@ -31,7 +31,16 @@ private:
     
     double inv_VT, inv_BF_VT, inv_BR_VT, IS_inv_VT, IS_inv_BF_VT, IS_inv_BR_VT;
     
+    const Vector* V_ptr = nullptr;
+    
 public:
+    
+    double g_bb, g_be, g_bc;
+    double g_eb, g_ee, g_ec;
+    double g_cb, g_ce, g_cc;
+    
+    double i_b, i_c, i_e;
+    
     BJT(const std::string& comp_name, int collector, int base, int emitter, 
         double bf, double br, double is, double Vt)
     {
@@ -51,6 +60,7 @@ public:
             throw std::runtime_error(std::string("BJT: All three nodes must be different"));
         }
         this->type = ComponentType::BJT;
+        this->category = ComponentCategory::NON_LINEAR;
         name = comp_name;
         bjt_type = NPN;
         
@@ -76,9 +86,36 @@ public:
         IS_inv_BR_VT = IS * inv_BR_VT;
     }
     
+    std::vector<GStampHook> getGStamps() override {
+        return {
+            {nb, nb, &g_bb}, 
+            {nb, ne, &g_be},
+            {nb, nc, &g_bc},
+            {ne, nb, &g_eb},
+            {ne, ne, &g_ee}, 
+            {ne, nc, &g_ec},
+            {nc, nb, &g_cb}, 
+            {nc, ne, &g_ce}, 
+            {nc, nc, &g_cc}
+        };
+    }
+
+    std::vector<IStampHook> getIStamps() override {
+        return {
+            {nb, &i_b}, 
+            {nc, &i_c}, 
+            {ne, &i_e}
+        };
+    }
+    
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
+        V_ptr = &V; 
+    }
     
     __attribute__((always_inline))
-    void stamp(Matrix& G, Vector& I, const Vector& V) override {
+    void onIterationStep() override {
+        const Vector& V = *V_ptr;
+        
         // Read node voltages (handle ground)
         double vc = V(nc);
         double vb = V(nb);
@@ -120,23 +157,24 @@ public:
         double ieq_c = ic - (gce * vbe + gcc * vbc);
         double ieq_e = ie - (-(gbe + gce) * vbe - (gbc + gcc) * vbc);
         
-         // ========================================
+        // ========================================
         // STAMPING - Complete 3x3 submatrix
         // ========================================
-        G(nb, nb) += gbe + gbc + G_MIN_STABILITY;
-        G(nb, ne) += -gbe;
-        G(ne, nb) += (-gbe - (gce + gcc));
-        G(ne, ne) += gbe + gce + G_MIN_STABILITY;
-        G(nb, nc) += -gbc;
-        G(nc, nb) += (gce + gcc - gbc);
-        G(nc, nc) += (gbc - gcc) + G_MIN_STABILITY;
-        G(nc, ne) += -gce;
-        G(ne, nc) += gcc;
+        g_bb = gbe + gbc + G_MIN_STABILITY;
+        g_be = -gbe;
+        g_bc = -gbc;
         
-        // Vettore delle correnti
-        I(nb) -= sign * ieq_b;
-        I(nc) -= sign * ieq_c;
-        I(ne) -= sign * ieq_e;
+        g_eb = (-gbe - (gce + gcc));
+        g_ee = gbe + gce + G_MIN_STABILITY;
+        g_ec = gcc;
+        
+        g_cb = (gce + gcc - gbc);
+        g_ce = -gce;
+        g_cc = (gbc - gcc) + G_MIN_STABILITY;
+        
+        i_b = -sign * ieq_b;
+        i_c = -sign * ieq_c;
+        i_e = -sign * ieq_e;
     }
     
     __attribute__((always_inline))

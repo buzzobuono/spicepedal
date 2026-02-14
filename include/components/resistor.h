@@ -11,6 +11,7 @@ class Resistor : public Component {
 private:
     double _r;
     int n1, n2;
+    double g, g_neg;
     
 public:
     Resistor(const std::string& comp_name, int node1, int node2, double r) {
@@ -18,20 +19,23 @@ public:
         if (node1 == node2) throw std::runtime_error("Resistor nodes must be different");
 
         type = ComponentType::RESISTOR;
+        category = ComponentCategory::LINEAR_STATIC;
+
         name = comp_name;
         n1 = node1;
         n2 = node2;
         _r = r;
-        is_static = true;
+        g = 1.0 / r;
+        g_neg = -g;
     }
     
-    void stampStatic(Matrix& G, Vector& I) override {
-        if (_r > R_MAX) return;
-        double g = 1.0 / std::max(_r, R_MIN);
-        G(n1, n1) += g;
-        G(n1, n2) -= g;
-        G(n2, n2) += g;
-        G(n2, n1) -= g;
+    std::vector<StaticGStampHook> getStaticGStamps() override {
+        return {
+            {n1, n1, g},
+            {n1, n2, g_neg},
+            {n2, n1, g_neg},
+            {n2, n2, g}
+        };
     }
     
     double getCurrent(const Vector& V) const override {

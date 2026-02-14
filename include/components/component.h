@@ -21,6 +21,32 @@ enum class ComponentType {
     SUBCIRCUIT
 };
 
+enum class ComponentCategory {
+    LINEAR_STATIC, 
+    LINEAR_TIME_VARIANT, 
+    NON_LINEAR
+};
+
+struct GStampHook {
+    int row, col;
+    double* source;
+};
+
+struct IStampHook {
+    int idx;
+    double* source;
+};
+
+struct StaticGStampHook {
+    int row, col;
+    double value;
+};
+
+struct StaticIStampHook {
+    int idx;
+    double value;
+};
+
 class Component {
     
     protected:
@@ -33,8 +59,7 @@ class Component {
     public:
     
     ComponentType type;
-    
-    bool is_static = false;
+    ComponentCategory category = ComponentCategory::NON_LINEAR;
     
     std::string name;
     
@@ -45,6 +70,18 @@ class Component {
     }
     
     virtual void prepare(Matrix& G, Vector& I, Vector& V, double dt) {};
+
+    virtual void onTimeStep() {};
+    
+    virtual void onIterationStep() {};
+    
+    virtual std::vector<StaticGStampHook> getStaticGStamps() { return {}; };
+
+    virtual std::vector<StaticIStampHook> getStaticIStamps() { return {}; };
+    
+    virtual std::vector<GStampHook> getGStamps() { return {}; };
+
+    virtual std::vector<IStampHook> getIStamps() { return {}; };
 
     virtual void stampStatic(Matrix& G, Vector& I) {};
     

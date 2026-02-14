@@ -16,20 +16,32 @@ struct ProfileData {
 };
 #endif
 
+#include <variant>
+
 class NewtonRaphsonSolver : public Solver {
 
     protected:
     
-    struct FastEntry {
-        double* address;
+    struct StaticFastEntry {
+        double* dest;
         double value;
     };
     
+    struct FastEntry {
+        double* dest;   // Indirizzo nella matrice G
+        double* source; // Indirizzo nel componente
+    };
+    
+    std::vector<StaticFastEntry> static_fast_G_entries;
+    std::vector<StaticFastEntry> static_fast_I_entries;
+    
     std::vector<FastEntry> fast_G_entries;
     std::vector<FastEntry> fast_I_entries;
-    std::vector<Component*> dynamic_components;
+    
+    std::vector<Capacitor*> linear_time_variant_components;
+    std::vector<BJT*> non_linear_components;
+    std::vector<Component*> legacy_components; 
     std::vector<BJT*> bjt_components;
-    std::vector<Capacitor*> cap_components;
     
     #ifdef DEBUG_MODE
     std::map<ComponentType, ProfileData> stamp_stats;
@@ -69,46 +81,20 @@ class NewtonRaphsonSolver : public Solver {
     }
     
     virtual void stampComponents() {
+        for (const auto& entry : static_fast_G_entries) {
+            *(entry.dest) += entry.value;
+        }
+        for (const auto& entry : static_fast_I_entries) {
+            *(entry.dest) += entry.value;
+        }
         for (const auto& entry : fast_G_entries) {
-            *(entry.address) += entry.value;
+            *(entry.dest) += *(entry.source);
         }
         for (const auto& entry : fast_I_entries) {
-            *(entry.address) += entry.value;
-        }
-
-        for (auto* bjt : bjt_components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            
-            // Chiamata statica: il compilatore sa che è un BJT
-            bjt->BJT::stamp(G, I, V); 
-            
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[bjt->type].total_time_ns += duration;
-            stamp_stats[bjt->type].calls++;
-            #endif
+            *(entry.dest) += *(entry.source);
         }
         
-        for (auto* cap : cap_components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            
-            // Chiamata statica: il compilatore sa che è un BJT
-            cap->Capacitor::stamp(G, I, V); 
-            
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[cap->type].total_time_ns += duration;
-            stamp_stats[cap->type].calls++;
-            #endif
-        }
-        
-        for (auto* comp : dynamic_components) {
+        for (auto* comp : legacy_components) {
             #ifdef DEBUG_MODE
             auto start = std::chrono::high_resolution_clock::now();
             #endif
@@ -138,13 +124,35 @@ class NewtonRaphsonSolver : public Solver {
     bool runNewtonRaphson() {
         this->sample_count++;
         
-        for (auto* cap : cap_components) {
-            cap->Capacitor::prepareTimeStep();
+        for (auto& comp : linear_time_variant_components) {
+            #ifdef DEBUG_MODE
+            auto start = std::chrono::high_resolution_clock::now();
+            #endif
+            comp->Capacitor::onTimeStep();
+            #ifdef DEBUG_MODE
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+            stamp_stats[comp->type].total_time_ns += duration;
+            stamp_stats[comp->type].calls++;
+            #endif
         }
         
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
             I.setZero();
+            
+            for (auto& comp : non_linear_components) {
+                #ifdef DEBUG_MODE
+                auto start = std::chrono::high_resolution_clock::now();
+                #endif
+                comp->BJT::onIterationStep();
+                #ifdef DEBUG_MODE
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+                stamp_stats[comp->type].total_time_ns += duration;
+                stamp_stats[comp->type].calls++;
+                #endif
+            }
             
             this->stampComponents();
             
@@ -201,38 +209,67 @@ class NewtonRaphsonSolver : public Solver {
         V_new.resize(circuit.num_nodes);
         V.setZero();
         
+        for (auto& comp : circuit.components) {
+            comp->prepare(G,I,V,dt);
+        }
+        
         fast_G_entries.clear();
         fast_I_entries.clear();
-        dynamic_components.clear();
-        
+        linear_time_variant_components.clear();
+        non_linear_components.clear();
+        legacy_components.clear();
         for (auto& comp : circuit.components) {
-            Matrix shadow_G = Matrix::Zero(circuit.num_nodes, circuit.num_nodes);
-            Vector shadow_I = Vector::Zero(circuit.num_nodes);
-            
-            comp->prepare(G, I, V, dt);
-            comp->stampStatic(shadow_G, shadow_I);
-            
-            for (int r = 0; r < circuit.num_nodes; ++r) {
-                for (int c = 0; c < circuit.num_nodes; ++c) {
-                    if (shadow_G(r, c) != 0.0) 
-                        fast_G_entries.push_back({&G(r, c), shadow_G(r, c)});
-                }
-                if (shadow_I(r) != 0.0) 
-                    fast_I_entries.push_back({&I(r), shadow_I(r)});
+            auto g_hooks = comp->getStaticGStamps();
+            for (auto& g_hook : g_hooks) {
+               static_fast_G_entries.push_back({
+                    &G(g_hook.row, g_hook.col),
+                    g_hook.value
+               });
             }
-            
-            if (!comp->is_static) {
-                if (comp->type == ComponentType::BJT) {
-                    bjt_components.push_back(static_cast<BJT*>(comp.get()));
-                } else if (comp->type == ComponentType::CAPACITOR) {
-                    cap_components.push_back(static_cast<Capacitor*>(comp.get()));
+            auto i_hooks = comp->getStaticIStamps();
+            for (auto& i_hook : i_hooks) {
+               static_fast_I_entries.push_back({
+                    &I(i_hook.idx),
+                    i_hook.value
+               });
+            }
+            auto static_g_hooks = comp->getGStamps();
+            for (auto& g_hook : static_g_hooks) {
+               fast_G_entries.push_back({
+                    &G(g_hook.row, g_hook.col),
+                    g_hook.source
+               });
+            }
+            auto static_i_hooks = comp->getIStamps();
+            for (auto& i_hook : static_i_hooks) {
+               fast_I_entries.push_back({
+                    &I(i_hook.idx),
+                    i_hook.source
+               });
+            }
+            switch (comp->category) {
+                case ComponentCategory::LINEAR_STATIC:
+                break;
+                
+                case ComponentCategory::LINEAR_TIME_VARIANT:
+                if (comp->type == ComponentType::CAPACITOR) {
+                    linear_time_variant_components.push_back(static_cast<Capacitor*>(comp.get()));
                 } else {
-                    dynamic_components.push_back(comp.get());
+                    legacy_components.push_back(comp.get());
                 }
+                break;
+                
+                case ComponentCategory::NON_LINEAR:
+                if (comp->type == ComponentType::BJT) {
+                    non_linear_components.push_back(static_cast<BJT*>(comp.get()));
+                } else {
+                    legacy_components.push_back(comp.get());
+                }
+                break;
             }
         }
         
-        auto sortByAddr = [](const FastEntry& a, const FastEntry& b) { return a.address < b.address; };
+        auto sortByAddr = [](const FastEntry& a, const FastEntry& b) { return a.dest < b.dest; };
         std::sort(fast_G_entries.begin(), fast_G_entries.end(), sortByAddr);
         std::sort(fast_I_entries.begin(), fast_I_entries.end(), sortByAddr);
         

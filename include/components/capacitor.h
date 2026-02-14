@@ -7,13 +7,17 @@
 #include "component.h"
 
 class Capacitor : public Component {
+    
+    private:
     double C;
-    double v_prev;   // tensione al passo precedente
-    double i_prev;   // corrente equivalente al passo precedente
-    double geq;
-    double ieq;
+    double v_prev = 0.0;
+    double i_prev = 0.0;
     int n1, n2;
-public:
+    double geq, geq_neg;
+    
+    public:
+    double ieq, ieq_neg;
+    
     Capacitor(const std::string& comp_name, int node1, int node2, double capacitance) {
         if (capacitance <= 0) {
             throw std::runtime_error(std::string("Capacitance must be positive"));
@@ -22,6 +26,8 @@ public:
             throw std::runtime_error(std::string("Capacitor nodes must be different"));
         }
         type = ComponentType::CAPACITOR;
+        category = ComponentCategory::LINEAR_TIME_VARIANT;
+
         name = comp_name;
         n1 = node1;
         n2 = node2;
@@ -36,23 +42,28 @@ public:
         } else {
             geq = 0.0; // Caso DC
         }
+        geq_neg = -geq;
     }
     
-    void stampStatic(Matrix& G, Vector& I) override {
-        G(n1, n1) += geq;
-        G(n1, n2) -= geq;
-        G(n2, n2) += geq;
-        G(n2, n1) -= geq;
-    }
-    
-    void prepareTimeStep() {
+    void onTimeStep() override {
         ieq = geq * v_prev + i_prev;
+        ieq_neg = -ieq;
     }
 
-    __attribute__((always_inline))
-    void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        I(n1) += ieq;
-        I(n2) -= ieq;
+    std::vector<StaticGStampHook> getStaticGStamps() override {
+        return {
+            {n1, n1, geq}, 
+            {n1, n2, geq_neg},
+            {n2, n1, geq_neg},
+            {n2, n2, geq}
+        };
+    }
+    
+    std::vector<IStampHook> getIStamps() override {
+        return {
+            {n1, &ieq},
+            {n2, &ieq_neg}
+        };
     }
     
     __attribute__((always_inline))
