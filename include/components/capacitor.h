@@ -13,6 +13,9 @@ class Capacitor : public Component {
     double geq;
     double ieq;
     int n1, n2;
+    double* i_n1_addr;
+    double* i_n2_addr;
+    
 public:
     Capacitor(const std::string& comp_name, int node1, int node2, double capacitance) {
         if (capacitance <= 0) {
@@ -36,6 +39,8 @@ public:
         } else {
             geq = 0.0; // Caso DC
         }
+        i_n1_addr = &I(n1);
+        i_n2_addr = &I(n2);
     }
     
     void stampStatic(Matrix& G, Vector& I) override {
@@ -45,14 +50,15 @@ public:
         G(n2, n1) -= geq;
     }
     
-    void prepareTimeStep() {
+    __attribute__((always_inline))
+    void prepareTimeStep() override {
         ieq = geq * v_prev + i_prev;
     }
 
     __attribute__((always_inline))
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        I(n1) += ieq;
-        I(n2) -= ieq;
+        *i_n1_addr += ieq;
+        *i_n2_addr -= ieq;
     }
     
     __attribute__((always_inline))

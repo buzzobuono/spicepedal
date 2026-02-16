@@ -13,6 +13,10 @@
 struct ProfileData {
     double total_time_ns = 0;
     long calls = 0;
+    double total_history_time_ns = 0;
+    long calls_history = 0;
+    double total_timestep_time_ns = 0;
+    long calls_timestep = 0;
 };
 #endif
 
@@ -27,9 +31,12 @@ class NewtonRaphsonSolver : public Solver {
     
     std::vector<FastEntry> fast_G_entries;
     std::vector<FastEntry> fast_I_entries;
-    std::vector<Component*> dynamic_components;
-    std::vector<BJT*> bjt_components;
-    std::vector<Capacitor*> cap_components;
+    std::tuple<
+        std::vector<BJT*>,
+        std::vector<Capacitor*>,
+        std::vector<Potentiometer*>,
+        std::vector<Component*>
+    > dynamic_lists;
     
     #ifdef DEBUG_MODE
     std::map<ComponentType, ProfileData> stamp_stats;
@@ -75,51 +82,30 @@ class NewtonRaphsonSolver : public Solver {
         for (const auto& entry : fast_I_entries) {
             *(entry.address) += entry.value;
         }
-
-        for (auto* bjt : bjt_components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            
-            // Chiamata statica: il compilatore sa che è un BJT
-            bjt->BJT::stamp(G, I, V); 
-            
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[bjt->type].total_time_ns += duration;
-            stamp_stats[bjt->type].calls++;
-            #endif
-        }
-        
-        for (auto* cap : cap_components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            
-            // Chiamata statica: il compilatore sa che è un BJT
-            cap->Capacitor::stamp(G, I, V); 
-            
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[cap->type].total_time_ns += duration;
-            stamp_stats[cap->type].calls++;
-            #endif
-        }
-        
-        for (auto* comp : dynamic_components) {
-            #ifdef DEBUG_MODE
-            auto start = std::chrono::high_resolution_clock::now();
-            #endif
-            comp->stamp(G, I, V);
-            #ifdef DEBUG_MODE
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-            stamp_stats[comp->type].total_time_ns += duration;
-            stamp_stats[comp->type].calls++;
-            #endif
-        }
+        std::apply([&](auto&... args) {
+            (..., [&](auto& vec) {
+                #ifdef DEBUG_MODE
+                if (vec.empty()) return;
+                auto start = std::chrono::high_resolution_clock::now();
+                #endif
+                for (auto* comp : vec) {
+                    comp->stamp(G, I, V);
+                }
+                #ifdef DEBUG_MODE
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+                using ElemType = std::remove_pointer_t<typename std::decay_t<decltype(vec)>::value_type>;
+                ComponentType key;
+                if constexpr (std::is_same_v<ElemType, Component>)
+                    key = ComponentType::GENERIC;
+                else
+                    key = vec.front()->type;
+                auto& stats = stamp_stats[key];
+                stats.total_time_ns += duration;
+                stats.calls += vec.size();
+                #endif
+            }(args));
+        }, dynamic_lists);
     }
 
     virtual void applySource() {
@@ -130,17 +116,63 @@ class NewtonRaphsonSolver : public Solver {
     }
     
     virtual void updateComponentsHistory() {
-        for (auto& comp : circuit.components) {
-            comp->updateHistory(V);
-        }
+        std::apply([&](auto&... args) {
+            (..., [&](auto& vec) {
+                #ifdef DEBUG_MODE
+                if (vec.empty()) return;
+                auto start = std::chrono::high_resolution_clock::now();
+                #endif
+                for (auto* comp : vec) {
+                    comp->updateHistory(V);
+                }
+                #ifdef DEBUG_MODE
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+                using ElemType = std::remove_pointer_t<typename std::decay_t<decltype(vec)>::value_type>;
+                ComponentType key;
+                if constexpr (std::is_same_v<ElemType, Component>)
+                    key = ComponentType::GENERIC;
+                else
+                    key = vec.front()->type;
+                auto& stats = stamp_stats[key];
+                stats.total_history_time_ns += duration;
+                stats.calls_history += vec.size();
+                #endif
+            }(args));
+        }, dynamic_lists);
+    }
+    
+    void prepareTimeStep() {
+        std::apply([&](auto&... args) {
+            (..., [&](auto& vec) {
+                #ifdef DEBUG_MODE
+                if (vec.empty()) return;
+                auto start = std::chrono::high_resolution_clock::now();
+                #endif
+                for (auto* comp : vec) {
+                    comp->prepareTimeStep();
+                }
+                #ifdef DEBUG_MODE
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+                using ElemType = std::remove_pointer_t<typename std::decay_t<decltype(vec)>::value_type>;
+                ComponentType key;
+                if constexpr (std::is_same_v<ElemType, Component>)
+                    key = ComponentType::GENERIC;
+                else
+                    key = vec.front()->type;
+                auto& stats = stamp_stats[key];
+                stats.total_timestep_time_ns += duration;
+                stats.calls_timestep += vec.size();
+                #endif
+            }(args));
+        }, dynamic_lists);
     }
     
     bool runNewtonRaphson() {
         this->sample_count++;
         
-        for (auto* cap : cap_components) {
-            cap->Capacitor::prepareTimeStep();
-        }
+        this->prepareTimeStep();
         
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
@@ -203,31 +235,33 @@ class NewtonRaphsonSolver : public Solver {
         
         fast_G_entries.clear();
         fast_I_entries.clear();
-        dynamic_components.clear();
+        
+        std::apply([](auto&... vec) { (vec.clear(), ...); }, dynamic_lists);
         
         for (auto& comp : circuit.components) {
-            Matrix shadow_G = Matrix::Zero(circuit.num_nodes, circuit.num_nodes);
-            Vector shadow_I = Vector::Zero(circuit.num_nodes);
-            
+            G.setZero();
+            I.setZero();
             comp->prepare(G, I, V, dt);
-            comp->stampStatic(shadow_G, shadow_I);
+            comp->stampStatic(G, I);
             
             for (int r = 0; r < circuit.num_nodes; ++r) {
                 for (int c = 0; c < circuit.num_nodes; ++c) {
-                    if (shadow_G(r, c) != 0.0) 
-                        fast_G_entries.push_back({&G(r, c), shadow_G(r, c)});
+                    if (G(r, c) != 0.0) 
+                        fast_G_entries.push_back({&G(r, c), G(r, c)});
                 }
-                if (shadow_I(r) != 0.0) 
-                    fast_I_entries.push_back({&I(r), shadow_I(r)});
+                if (I(r) != 0.0) 
+                    fast_I_entries.push_back({&I(r), I(r)});
             }
             
             if (!comp->is_static) {
                 if (comp->type == ComponentType::BJT) {
-                    bjt_components.push_back(static_cast<BJT*>(comp.get()));
+                    std::get<std::vector<BJT*>>(dynamic_lists).push_back(static_cast<BJT*>(comp.get()));
                 } else if (comp->type == ComponentType::CAPACITOR) {
-                    cap_components.push_back(static_cast<Capacitor*>(comp.get()));
+                    std::get<std::vector<Capacitor*>>(dynamic_lists).push_back(static_cast<Capacitor*>(comp.get()));
+                } else if (comp->type == ComponentType::POTENTIOMETER) {
+                    std::get<std::vector<Potentiometer*>>(dynamic_lists).push_back(static_cast<Potentiometer*>(comp.get()));
                 } else {
-                    dynamic_components.push_back(comp.get());
+                    std::get<std::vector<Component*>>(dynamic_lists).push_back(comp.get());
                 }
             }
         }
@@ -235,6 +269,14 @@ class NewtonRaphsonSolver : public Solver {
         auto sortByAddr = [](const FastEntry& a, const FastEntry& b) { return a.address < b.address; };
         std::sort(fast_G_entries.begin(), fast_G_entries.end(), sortByAddr);
         std::sort(fast_I_entries.begin(), fast_I_entries.end(), sortByAddr);
+        
+        #ifdef DEBUG_MODE
+        auto& generic = std::get<std::vector<Component*>>(dynamic_lists);
+        for (auto* comp : generic) {
+            std::cout << "GENERIC: " << comp->name 
+            << " type=" << static_cast<int>(comp->type) << std::endl;
+        }
+        #endif
         
         this->initCounters();
         circuit.reset();
@@ -271,33 +313,41 @@ class NewtonRaphsonSolver : public Solver {
     
     #ifdef DEBUG_MODE
     void printProcessStatistics() override {
-        // Chiama la base per i dati generali
         Solver::printProcessStatistics();
-        
-        std::cout << "[DEBUG] Component Stamping Profiling" << std::endl;
-
+        std::cout << "[DEBUG] Component Profiling" << std::endl;
         double total_stamp_time_ms = 0;
-        
-        // Iteriamo direttamente sulla mappa dei dati raccolti
         for (auto const& [type, data] : stamp_stats) {
+            double total_timestep_ms = data.total_timestep_time_ns / 1e6;
+            double avg_timestep_ns = (data.calls_timestep > 0) ? (static_cast<double>(data.total_timestep_time_ns) / data.calls_timestep) : 0;
+            
             double total_ms = data.total_time_ns / 1e6;
             double avg_ns = (data.calls > 0) ? (static_cast<double>(data.total_time_ns) / data.calls) : 0;
+            
+            double total_history_ms = data.total_history_time_ns / 1e6;
+            double avg_history_ns = (data.calls_history > 0) ? (static_cast<double>(data.total_history_time_ns) / data.calls_history) : 0;
+            
             total_stamp_time_ms += total_ms;
-
-            // Stampiamo l'ID intero dell'enum per massima semplicità
-            std::cout << "  [Type ID: " << std::setw(2) << static_cast<int>(type) << "]" 
+            std::cout << "Prepare Time Step [Type ID: " << std::setw(2) << static_cast<int>(type) << "]" 
+                      << " Total: " << std::fixed << std::setprecision(2) << std::setw(8) << total_timestep_ms << " ms"
+                      << " | Avg: " << std::setw(8) << std::setprecision(1) << avg_timestep_ns << " ns/call" 
+                      << " (" << data.calls_timestep << " calls)" << std::endl;
+            
+            std::cout << "Stamping [Type ID: " << std::setw(2) << static_cast<int>(type) << "]" 
                       << " Total: " << std::fixed << std::setprecision(2) << std::setw(8) << total_ms << " ms"
                       << " | Avg: " << std::setw(8) << std::setprecision(1) << avg_ns << " ns/call" 
                       << " (" << data.calls << " calls)" << std::endl;
+            
+            std::cout << " Update History [Type ID: " << std::setw(2) << static_cast<int>(type) << "]" 
+                      << " Total: " << std::fixed << std::setprecision(2) << std::setw(8) << total_history_ms << " ms"
+                      << " | Avg: " << std::setw(8) << std::setprecision(1) << avg_history_ns << " ns/call" 
+                      << " (" << data.calls_history << " calls)" << std::endl;
         }
-
         std::cout << "  ----------------------------------------" << std::endl;
         std::cout << "  Total Stamping Time: " << total_stamp_time_ms << " ms" << std::endl;
         std::cout << "  Total LU Solve Time: " << lu_total_time_ns / 1e6 << " ms" << std::endl;
         std::cout << std::endl;
     }
     #endif
-
     
 };
 

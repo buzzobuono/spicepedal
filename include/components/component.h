@@ -6,6 +6,7 @@
 #include "utils/math.h"
 
 enum class ComponentType {
+    GENERIC,
     RESISTOR, 
     CAPACITOR, 
     INDUCTOR,
@@ -45,8 +46,10 @@ class Component {
     }
     
     virtual void prepare(Matrix& G, Vector& I, Vector& V, double dt) {};
-
+    
     virtual void stampStatic(Matrix& G, Vector& I) {};
+    
+    virtual void prepareTimeStep() {};
     
     virtual void stamp(Matrix& G, Vector& I, const Vector& V) {};
     
