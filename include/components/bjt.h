@@ -31,6 +31,20 @@ private:
     
     double inv_VT, inv_BF_VT, inv_BR_VT, IS_inv_VT, IS_inv_BF_VT, IS_inv_BR_VT;
     
+    double* g_nb_nb_addr;
+    double* g_nb_nc_addr;
+    double* g_nb_ne_addr;
+    double* g_nc_nb_addr;
+    double* g_nc_nc_addr;
+    double* g_nc_ne_addr;
+    double* g_ne_nb_addr;
+    double* g_ne_nc_addr;
+    double* g_ne_ne_addr;
+
+    double* i_nb_addr;
+    double* i_nc_addr;
+    double* i_ne_addr;
+
 public:
     BJT(const std::string& comp_name, int collector, int base, int emitter, 
         double bf, double br, double is, double Vt)
@@ -76,7 +90,25 @@ public:
         IS_inv_BR_VT = IS * inv_BR_VT;
     }
     
+    void prepare(Matrix& G, Vector& I, Vector& V, double dt) override {
+        g_nb_nb_addr = &G(nb, nb);
+        g_nb_nc_addr = &G(nb, nc);
+        g_nb_ne_addr = &G(nb, ne);
+
+        g_nc_nb_addr = &G(nc, nb);
+        g_nc_nc_addr = &G(nc, nc);
+        g_nc_ne_addr = &G(nc, ne);
+
+        g_ne_nb_addr = &G(ne, nb);
+        g_ne_nc_addr = &G(ne, nc);
+        g_ne_ne_addr = &G(ne, ne);
+
+        i_nb_addr = &I(nb);
+        i_nc_addr = &I(nc);
+        i_ne_addr = &I(ne);
     
+    }
+
     __attribute__((always_inline))
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
         // Read node voltages (handle ground)
@@ -123,20 +155,20 @@ public:
          // ========================================
         // STAMPING - Complete 3x3 submatrix
         // ========================================
-        G(nb, nb) += gbe + gbc + G_MIN_STABILITY;
-        G(nb, ne) += -gbe;
-        G(ne, nb) += (-gbe - (gce + gcc));
-        G(ne, ne) += gbe + gce + G_MIN_STABILITY;
-        G(nb, nc) += -gbc;
-        G(nc, nb) += (gce + gcc - gbc);
-        G(nc, nc) += (gbc - gcc) + G_MIN_STABILITY;
-        G(nc, ne) += -gce;
-        G(ne, nc) += gcc;
+        *g_nb_nb_addr += gbe + gbc + G_MIN_STABILITY;
+        *g_nb_nc_addr += -gbc;
+        *g_nb_ne_addr += -gbe;
+        *g_nc_nb_addr += (gce + gcc - gbc);
+        *g_nc_nc_addr += (gbc - gcc) + G_MIN_STABILITY;
+        *g_nc_ne_addr += -gce;
+        *g_ne_nb_addr += (-gbe - (gce + gcc));
+        *g_ne_nc_addr += gcc;
+        *g_ne_ne_addr += gbe + gce + G_MIN_STABILITY;
         
         // Vettore delle correnti
-        I(nb) -= sign * ieq_b;
-        I(nc) -= sign * ieq_c;
-        I(ne) -= sign * ieq_e;
+        *i_nb_addr -= sign * ieq_b;
+        *i_nc_addr -= sign * ieq_c;
+        *i_ne_addr -= sign * ieq_e;
     }
     
     __attribute__((always_inline))
