@@ -26,6 +26,7 @@ private:
     TaperType _taper;
     std::string _param;
     int n1, n2, nw;
+    double r1, r2;
     
     void stampInternalResistor(Matrix& G, int nA, int nB, double res) {
         if (nA == nB || res > R_MAX) return;
@@ -72,20 +73,25 @@ public:
         nw = nodew;
     }
 
-    void stamp(Matrix& G, Vector& I, const Vector& V) override {
-        if (_r_total > R_MAX) return;
-        
-        double taperedPos = getTaperedPosition();
-        double r1_val = std::max(_r_total * (1.0 - taperedPos), R_MIN_SAFE);
-        double r2_val = std::max(_r_total * taperedPos, R_MIN_SAFE);
-
-        stampInternalResistor(G, n1, nw, r1_val);
-        stampInternalResistor(G, n2, nw, r2_val);
-        
+    __attribute__((always_inline))
+    void stampStatic(Matrix& G, Vector& I) override {
         G(n1, n1) += G_MIN_STABILITY;
         G(n2, n2) += G_MIN_STABILITY;
         G(nw, nw) += G_MIN_STABILITY;
-        
+    }
+    
+    __attribute__((always_inline))
+    void prepareTimeStep() override {
+        double taperedPos = getTaperedPosition();
+        r1 = std::max(_r_total * (1.0 - taperedPos), R_MIN_SAFE);
+        r2 = std::max(_r_total * taperedPos, R_MIN_SAFE);
+    }
+    
+    __attribute__((always_inline))
+    void stamp(Matrix& G, Vector& I, const Vector& V) override {
+        if (_r_total > R_MAX) return;
+        stampInternalResistor(G, n1, nw, r1);
+        stampInternalResistor(G, n2, nw, r2);
     }
 };
 

@@ -8,7 +8,7 @@ BACKEND ?= INTERNAL
 
 CXX ?= g++
 
-CXXFLAGS += -std=c++17 -O3 -march=native -flto -funroll-loops -fno-math-errno -fno-trapping-math #-Wall -Wextra -fsanitize=address
+CXXFLAGS += -Rpass=loop-vectorize -std=c++17 -O3 -march=native -flto -funroll-loops -fno-math-errno -fno-trapping-math #-Wall -Wextra -fsanitize=address
 ifeq ($(FAST_MATH), 1)
     CXXFLAGS += -ffast-math -freciprocal-math -fassociative-math -fno-signed-zeros -mprefer-vector-width=256
 endif
