@@ -28,7 +28,9 @@ private:
 
     double vd_prev = 0.0;
     double dt = 0.0;
-
+    double ieq_cap = 0.0;
+    double g_cap = 0.0;
+    
     int n1, n2;
     
 public:
@@ -59,60 +61,45 @@ public:
         this->dt = dt;
     }
     
+    void prepareTimeStep() override {
+        if (dt > 0 && _Cj0 > 0) {
+            double vd_cap_prev = std::clamp(vd_prev, -5.0, 0.5);
+            double Cj;
+            if (vd_cap_prev < 0) {
+                Cj = _Cj0 * std::pow(1.0 - vd_cap_prev / _Vj, -_Mj);
+            } else {
+                Cj = _Cj0 * 2.0;
+            }
+            g_cap = Cj / dt;
+            ieq_cap = g_cap * vd_prev;
+        }
+    }
+    
     void stamp(Matrix& G, Vector& I, const Vector& V) override {
         double vd = V(n1) - V(n2);
         vd = std::clamp(vd, -5.0, 1.0);
         
-        // --- DC PART (identica a versione minimal) ---
-        double Vt = _n * _Vt;
-        double exp_term = std::exp(vd / Vt);
+        double Vt_total = _n * _Vt;
+        double exp_term = std::exp(vd / Vt_total);
         
         double id = _Is * (exp_term - 1.0);
-        double gd = (_Is / Vt) * exp_term;
+        double gd = (_Is / Vt_total) * exp_term;
         double ieq = id - gd * vd;
         
-        if (n1 != 0) {
-            G(n1, n1) += gd;
-            if (n2 != 0) G(n1, n2) -= gd;
-            I(n1) -= ieq;
-        }
-        if (n2 != 0) {
-            G(n2, n2) += gd;
-            if (n1 != 0) G(n2, n1) -= gd;
-            I(n2) += ieq;
-        }
-
-        // --- CAPACITIVE PART (solo se abilitata e dt > 0) ---
+        G(n1, n1) += gd;
+        G(n1, n2) -= gd;
+        G(n2, n1) -= gd;
+        G(n2, n2) += gd;
+        I(n1) -= ieq;
+        I(n2) += ieq;
+        
         if (dt > 0 && _Cj0 > 0) {
-            // Capacità non lineare
-            double vd_cap = std::clamp(vd, -5.0, 0.5);  // Limita forward a 0.5V
-            double Cj;
-            
-            if (vd_cap < 0) {
-                // Reverse bias: formula standard
-                Cj = _Cj0 * pow(1.0 - vd_cap / _Vj, -_Mj);
-            } else {
-                // Forward bias: satura a valore costante (stabile!)
-                Cj = _Cj0 * 2.0;  // ~2x capacità nominale
-            }
-
-            double gC = Cj / dt;
-            double iC = gC * vd_prev;
-
-            if (n1 != 0 && n2 != 0) {
-                G(n1, n1) += gC;
-                G(n1, n2) -= gC;
-                G(n2, n1) -= gC;
-                G(n2, n2) += gC;
-                I(n1) += iC;  // CORRETTO: stesso segno della parte DC
-                I(n2) -= iC;
-            } else if (n1 != 0) {
-                G(n1, n1) += gC;
-                I(n1) += iC;
-            } else if (n2 != 0) {
-                G(n2, n2) += gC;
-                I(n2) -= iC;
-            }
+            G(n1, n1) += g_cap;
+            G(n1, n2) -= g_cap;
+            G(n2, n1) -= g_cap;
+            G(n2, n2) += g_cap;
+            I(n1) += ieq_cap;
+            I(n2) -= ieq_cap;
         }
     }
     

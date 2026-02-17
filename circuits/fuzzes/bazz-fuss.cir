@@ -19,7 +19,7 @@ R2 4 0 100M
 .include circuits/models/diodes.lib
 .include circuits/models/transistors.lib
 *.probe V(5) V(7)
-*.probe I(R1) I(C1) I(Q1) I(D1)
+.probe I(R1) I(C1) I(Q1) I(D1)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2
